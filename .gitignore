@@ -1,0 +1,11 @@
+# Python
+**/__pycache__/
+*.pyc
+# rl_games training output (checkpoints + summaries) + viewer layout
+runs/
+imgui.ini
+# author_world output — regenerated each run
+assets/world*.usd
+# real anymal_c robot — large meshes/textures + ANYbotics license; NOT vendored.
+# Regenerate via urdf_usd_converter + prep_anymal_usd.py (see README).
+assets/anymal_converted/
