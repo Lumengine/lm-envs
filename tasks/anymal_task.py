@@ -49,6 +49,9 @@ REW_LIN_XY, REW_ANG_Z = 1.0, 0.5
 CMD_X, CMD_Y, CMD_YAW = (-2.0, 2.0), (-1.0, 1.0), (-1.0, 1.0)
 H_MIN_FRAC, UPRIGHT_MIN = 0.55, 0.6
 MAX_EPISODE_LENGTH = 1000
+# Net contact force on the base link (articulation link 0) above this => the trunk is on
+# the ground = a fall (complements the height/upright test with a real contact signal).
+BASE_CONTACT_FAIL_N = float(os.environ.get("LM_RL_BASE_CONTACT_FAIL_N", "1.0"))
 
 # IsaacGymEnvs AnymalPPO.yaml training config, deep-merged into rl.train's base. The
 # default rl_games config is cartpole-sized ([32,32] MLP) — too small to represent a
@@ -72,46 +75,32 @@ def _quat_rotate_inv(q, v):
     return v + qw * t + torch.cross(qv, t, dim=1)
 
 
-class AnymalTask:
-    name = "Anymal"
-    num_obs = 48
-    num_actions = N_DOF
-    clip_obs = CLIP_OBS
+class AnymalTask(rl.VecTask):
+    """ANYmal velocity-command locomotion on rl.VecTask: the base owns the step/reset
+    loop; the hooks below define the obs/reward/reset and the PD-target action."""
 
     def __init__(self, num_envs=NUM_ENVS, headless=True):
-        self.num_envs = int(num_envs)
         prep_anymal_usd.main()   # floating base + PD drives (idempotent)
-        rl.author_world(_ROBOT, _WORLD, num_envs=self.num_envs, spacing=ENV_SPACING,
+        rl.author_world(_ROBOT, _WORLD, num_envs=int(num_envs), spacing=ENV_SPACING,
                         ground=True, ground_z=GROUND_Z, spawn_z=0.0)
-        self.sim, self.runner = rl.create_world(
-            _WORLD, num_envs=self.num_envs, dofs_per_actor=N_DOF,
+        sim, runner = rl.create_world(
+            _WORLD, num_envs=int(num_envs), dofs_per_actor=N_DOF,
             config=rl.SimConfig(substeps=SUBSTEPS, device="auto"),
             headless=headless, title="ANYmal (rl_games, vel-cmd)")
-        self.sim.play()
-        self.device = self.sim.device
-        import torch
-        self._torch = torch
-        self._captured = False
-        self._reset_buf = None
+        sim.play()
+        super().__init__(sim, runner, num_obs=48, num_actions=N_DOF, name="Anymal",
+                         clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,
+                         seed=int(os.environ.get("LM_RL_SEED", "0")))
         self._nstep = 0
         self._drive = None   # set to the _DRIVE list (windowed play) -> live UI command
 
-    # -- bring-up -----------------------------------------------------------
-
-    @property
-    def ready(self):
-        return self.sim._batch_ready()
-
-    def warmup_step(self):
-        self.sim.simulate(); self.sim.fetch_results()
-        if self.ready and not self._captured:
-            self._capture()
-        return self.ready
+    # -- task hooks ---------------------------------------------------------
 
     def _capture(self):
         torch = self._torch; dev = self.device
         self._dof = self.sim.acquire_dof_state_tensor()
         self._root = self.sim.acquire_root_state_tensor()
+        self._contact = self.sim.acquire_link_net_contact_force_tensor()   # (envs, links, 3)
         self.sim.refresh_dof_state_tensor(); self.sim.refresh_root_state_tensor()
         # PD-held stance + stand height are the references (DOF order opaque in the
         # 60-link tree; the settled state IS the default, in batch order).
@@ -127,11 +116,6 @@ class AnymalTask:
         home[:, 2] = stand_h
         home[:, 6] = 1.0
         self._home = home
-        self._progress = torch.zeros(self.num_envs, device=dev)
-        self._obs = torch.zeros(self.num_envs, self.num_obs, device=dev)
-        self._captured = True
-
-    # -- task hooks ---------------------------------------------------------
 
     def _sample_commands(self, ids):
         torch = self._torch; dev = self.device; n = ids.numel()
@@ -152,16 +136,25 @@ class AnymalTask:
         self._commands[ids, 1] = torch.empty(n, device=dev).uniform_(*CMD_Y)
         self._commands[ids, 2] = torch.empty(n, device=dev).uniform_(*CMD_YAW)
 
-    def _compute_obs(self, clipped=True):
-        torch = self._torch
-        self.sim.refresh_dof_state_tensor(); self.sim.refresh_root_state_tensor()
+    def _pre_physics_step(self, actions):
+        # `actions` is already clipped to [-1, 1] by the base.
+        if self._drive is not None:   # live UI command -> every env, every step
+            self._commands[:, 0] = self._drive[0]
+            self._commands[:, 1] = self._drive[1]
+            self._commands[:, 2] = self._drive[2]
+        self._prev_action = actions
+        targets = self._default_dof + ACTION_SCALE * actions
+        self.sim.set_dof_position_target_tensor(targets)
+
+    def _compute_observations(self):
+        self.sim.refresh_root_state_tensor()
         root, dof = self._root, self._dof
         quat = root[:, 3:7]
         self._lin_body = _quat_rotate_inv(quat, root[:, 7:10])
         self._ang_body = _quat_rotate_inv(quat, root[:, 10:13])
         proj_grav = _quat_rotate_inv(quat, self._world_down)
         self._up_proj = -proj_grav[:, 2]
-        o = self._obs
+        o = self.obs_buf
         o[:, 0:3] = self._lin_body * LIN_VEL_SCALE
         o[:, 3:6] = self._ang_body * ANG_VEL_SCALE
         o[:, 6:9] = proj_grav
@@ -169,71 +162,42 @@ class AnymalTask:
         o[:, 12:24] = dof[:, :N_DOF, 0] - self._default_dof
         o[:, 24:36] = dof[:, :N_DOF, 1] * DOF_VEL_SCALE
         o[:, 36:48] = self._prev_action
-        return o.clamp(-CLIP_OBS, CLIP_OBS) if clipped else o
+
+    def _compute_reward(self):
+        torch = self._torch
+        lin_err = torch.sum((self._commands[:, :2] - self._lin_body[:, :2]) ** 2, dim=1)
+        ang_err = (self._commands[:, 2] - self._ang_body[:, 2]) ** 2
+        self.rew_buf = torch.clamp(
+            torch.exp(-lin_err / TRACK_SIGMA) * REW_LIN_XY
+            + torch.exp(-ang_err / TRACK_SIGMA) * REW_ANG_Z, min=0.0)
+
+        height = self._root[:, 2]
+        # Real foot/trunk contact: base link (articulation link 0) on the ground = a fall.
+        self.sim.refresh_link_net_contact_force_tensor()
+        base_contact = self._contact[:, 0, :].norm(dim=1)
+        fail = (height < self._h_min) | (self._up_proj < UPRIGHT_MIN) | (base_contact > BASE_CONTACT_FAIL_N)
+        self.reset_buf = fail.float()
+
+        self._nstep += 1
+        if self._nstep % 500 == 0:
+            cmd = self._commands.mean(0)
+            print(f"[anymal-dbg] step {self._nstep} | ep_len(mean)={float(self.progress_buf.mean()):.1f} "
+                  f"| track_rew={float(self.rew_buf.mean()):.3f} | vx={float(self._lin_body[:,0].mean()):+.2f} "
+                  f"(cmd_x~{float(cmd[0]):+.2f}) | upright={float(self._up_proj.mean()):.2f} "
+                  f"| height={float(height.mean()):.2f} | base_contact>{BASE_CONTACT_FAIL_N:g}N="
+                  f"{int((base_contact > BASE_CONTACT_FAIL_N).sum())} | fails={int(fail.sum())}", flush=True)
 
     def _reset_idx(self, ids):
         torch = self._torch; n = ids.numel(); dev = self.device
         self._root[ids] = self._home[ids]
         self._dof[ids, :N_DOF, 0] = self._default_dof[ids] * (0.5 + torch.rand(n, N_DOF, device=dev))
         self._dof[ids, :N_DOF, 1] = (torch.rand(n, N_DOF, device=dev) - 0.5) * 0.2
-        self.sim.set_root_state_tensor(self._root)
-        self.sim.set_dof_state_tensor(self._dof)
-        self.sim.set_dof_position_target_tensor(self._default_dof)
+        self.sim.set_root_state_tensor_indexed(self._root, ids)
+        self.sim.set_dof_state_tensor_indexed(self._dof, ids)
+        self.sim.set_dof_position_target_tensor_indexed(self._default_dof, ids)
         self._prev_action[ids] = 0.0
         self._sample_commands(ids)
-        self._progress[ids] = 0.0
-
-    def reset(self):
-        if not self._captured:
-            self._capture()
-        self._reset_idx(self._torch.arange(self.num_envs, device=self.device))
-        self._reset_buf = None
-        return self._compute_obs()
-
-    def step(self, actions):
-        torch = self._torch
-        reset_prev = self._reset_buf
-
-        if self._drive is not None:   # live UI command -> every env, every step
-            self._commands[:, 0] = self._drive[0]
-            self._commands[:, 1] = self._drive[1]
-            self._commands[:, 2] = self._drive[2]
-
-        self._prev_action = actions
-        targets = self._default_dof + ACTION_SCALE * actions
-        self.sim.set_dof_position_target_tensor(targets)
-        self.sim.simulate(); self.sim.fetch_results(); self.sim.refresh_dof_state_tensor()
-
-        self._progress += 1.0
-        if reset_prev is not None:
-            ids = reset_prev.nonzero(as_tuple=False).flatten()
-            if ids.numel() > 0:
-                self._reset_idx(ids)
-                self.sim.refresh_dof_state_tensor()
-
-        obs = self._compute_obs(clipped=False)
-        lin_err = torch.sum((self._commands[:, :2] - self._lin_body[:, :2]) ** 2, dim=1)
-        ang_err = (self._commands[:, 2] - self._ang_body[:, 2]) ** 2
-        reward = torch.clamp(
-            torch.exp(-lin_err / TRACK_SIGMA) * REW_LIN_XY
-            + torch.exp(-ang_err / TRACK_SIGMA) * REW_ANG_Z, min=0.0)
-
-        height = self._root[:, 2]
-        fail = (height < self._h_min) | (self._up_proj < UPRIGHT_MIN)
-        timeout = self._progress >= float(MAX_EPISODE_LENGTH - 1)
-        reset = fail | timeout
-        self._reset_buf = reset
-
-        self._nstep += 1
-        if self._nstep % 500 == 0:
-            cmd = self._commands.mean(0)
-            print(f"[anymal-dbg] step {self._nstep} | ep_len(mean)={float(self._progress.mean()):.1f} "
-                  f"| track_rew={float(reward.mean()):.3f} | vx={float(self._lin_body[:,0].mean()):+.2f} "
-                  f"(cmd_x~{float(cmd[0]):+.2f}) | upright={float(self._up_proj.mean()):.2f} "
-                  f"| height={float(height.mean()):.2f} | fails={int(fail.sum())}", flush=True)
-
-        extras = {"time_outs": timeout.float()}
-        return obs.clamp(-CLIP_OBS, CLIP_OBS), reward, reset.float(), extras
+        self.progress_buf[ids] = 0.0
 
 
 # Live drive command (vx, vy, yaw), shared between the UI sliders and the task. When
