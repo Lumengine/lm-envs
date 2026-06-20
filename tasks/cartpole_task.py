@@ -42,112 +42,56 @@ CLIP_OBS    = 5.0
 MAX_EPISODE_LENGTH = 500
 
 
-class CartpoleTask:
-    """Vectorized cartpole on the USD world (fixed-base slider + pole)."""
-
-    name = "Cartpole"
-    num_obs = 4
-    num_actions = 1
-    clip_obs = CLIP_OBS
+class CartpoleTask(rl.VecTask):
+    """Vectorized cartpole on the USD world (fixed-base slider + pole), on rl.VecTask:
+    the base owns the step/reset loop; this fills the five task hooks."""
 
     def __init__(self, num_envs=NUM_ENVS, headless=True):
-        self.num_envs = int(num_envs)
-        rl.author_world(_ROBOT_USD, _WORLD_USD, num_envs=self.num_envs, spacing=ENV_SPACING)
-        self.sim, self.runner = rl.create_world(
-            _WORLD_USD, num_envs=self.num_envs, dofs_per_actor=NUM_DOFS,
+        rl.author_world(_ROBOT_USD, _WORLD_USD, num_envs=int(num_envs), spacing=ENV_SPACING)
+        sim, runner = rl.create_world(
+            _WORLD_USD, num_envs=int(num_envs), dofs_per_actor=NUM_DOFS,
             config=rl.SimConfig(substeps=2, device="auto"),
             headless=headless, title="Cartpole (rl_games)")
-        self.sim.play()
-        self.device = self.sim.device
-        import torch
-        self._torch = torch
+        sim.play()
+        super().__init__(sim, runner, num_obs=4, num_actions=1, name="Cartpole",
+                         clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,
+                         seed=int(os.environ.get("LM_RL_SEED", "0")))
         self._dof = None
-        self._obs = torch.zeros(self.num_envs, self.num_obs, device=self.device)
-        self._progress = torch.zeros(self.num_envs, device=self.device)
-        self._reset_buf = None        # envs to reset at the start of the next step
-
-    # -- bring-up -----------------------------------------------------------
-
-    @property
-    def ready(self):
-        # FULL readiness for tensor I/O: not just the articulation count, but the
-        # direct-GPU API initialized (max_dofs) — the setters/getters silently no-op
-        # until then, so stepping before this means actuation forces are dropped.
-        return self.sim._batch_ready()
-
-    def warmup_step(self):
-        self.sim.simulate(); self.sim.fetch_results()
-        if self.sim.ready and self._dof is None:
-            self._dof = self.sim.acquire_dof_state_tensor()
-        return self.ready
 
     # -- task hooks ---------------------------------------------------------
 
-    def _compute_obs(self, clipped=True):
-        d = self._dof
-        o = self._obs
+    def _capture(self):
+        self._dof = self.sim.acquire_dof_state_tensor()
+
+    def _pre_physics_step(self, actions):
+        forces = self._torch.zeros(self.num_envs, NUM_DOFS, device=self.device)
+        forces[:, 0] = actions.reshape(-1) * FORCE_MAG     # action already clipped by the base
+        self.sim.set_dof_actuation_force_tensor(forces)
+
+    def _compute_observations(self):
+        d, o = self._dof, self.obs_buf
         o[:, 0] = d[:, 0, 0]   # cart_pos
         o[:, 1] = d[:, 0, 1]   # cart_vel
         o[:, 2] = d[:, 1, 0]   # pole_angle
         o[:, 3] = d[:, 1, 1]   # pole_vel
-        return o.clamp(-CLIP_OBS, CLIP_OBS) if clipped else o
 
-    def _reset_idx(self, ids):
-        n = ids.numel()
-        # Reference cartpole reset: dof positions ~U(-0.1, 0.1), vels ~U(-0.25, 0.25).
-        self._dof[ids, :, 0] = 0.2 * (self._torch.rand(n, NUM_DOFS, device=self.device) - 0.5)
-        self._dof[ids, :, 1] = 0.5 * (self._torch.rand(n, NUM_DOFS, device=self.device) - 0.5)
-        self.sim.set_dof_state_tensor(self._dof)
-        self._progress[ids] = 0.0
-
-    def reset(self):
-        if self._dof is None:
-            self._dof = self.sim.acquire_dof_state_tensor()
-        self._reset_idx(self._torch.arange(self.num_envs, device=self.device))
-        self.sim.set_dof_actuation_force_tensor(
-            self._torch.zeros(self.num_envs, NUM_DOFS, device=self.device))
-        self._reset_buf = None
-        return self._compute_obs()
-
-    def step(self, actions):
+    def _compute_reward(self):
         torch = self._torch
-        # Match IsaacGym's Cartpole post_physics_step(): reset envs flagged by
-        # the previous step after this simulation step, before obs/reward.
-        reset_from_previous_step = self._reset_buf
-
-        forces = torch.zeros(self.num_envs, NUM_DOFS, device=self.device)
-        forces[:, 0] = actions.reshape(-1).clamp(-1.0, 1.0) * FORCE_MAG
-        self.sim.set_dof_actuation_force_tensor(forces)
-        self.sim.simulate(); self.sim.fetch_results(); self.sim.refresh_dof_state_tensor()
-
-        self._progress += 1.0
-        if reset_from_previous_step is not None:
-            ids = reset_from_previous_step.nonzero(as_tuple=False).flatten()
-            if ids.numel() > 0:
-                self._reset_idx(ids)
-                self.sim.refresh_dof_state_tensor()
-
-        obs = self._compute_obs(clipped=False)
-        cart_pos, cart_vel = obs[:, 0], obs[:, 1]
-        pole_angle, pole_vel = obs[:, 2], obs[:, 3]
+        o = self.obs_buf
+        cart_pos, cart_vel, pole_angle, pole_vel = o[:, 0], o[:, 1], o[:, 2], o[:, 3]
         reward = 1.0 - pole_angle * pole_angle - 0.01 * cart_vel.abs() - 0.005 * pole_vel.abs()
         fail = (cart_pos.abs() > CART_LIMIT) | (pole_angle.abs() > ANGLE_LIMIT)
-        reward = torch.where(fail, torch.full_like(reward, -2.0), reward)
+        self.rew_buf = torch.where(fail, torch.full_like(reward, -2.0), reward)
+        self.reset_buf = fail.float()
 
-        timeout = self._progress >= float(MAX_EPISODE_LENGTH - 1)
-        reset = fail | timeout
-        self._reset_buf = reset            # these reset at the start of the next step
-
-        self._nstep = getattr(self, "_nstep", 0) + 1
-        if self._nstep % 500 == 0:
-            print(f"[task-dbg] step {self._nstep} | ep_len(mean)={float(self._progress.mean()):.1f} "
-                  f"| |pole|(mean)={float(pole_angle.abs().mean()):.3f} | fails={int(fail.sum())} "
-                  f"| reward(mean)={float(reward.mean()):.3f} "
-                  f"| cart_pos[min={float(cart_pos.min()):+.3f} max={float(cart_pos.max()):+.3f}] "
-                  f"| cart_vel|max|={float(cart_vel.abs().max()):.3f}", flush=True)
-
-        extras = {"time_outs": timeout.float()}
-        return obs.clamp(-CLIP_OBS, CLIP_OBS), reward, reset.float(), extras
+    def _reset_idx(self, ids):
+        torch = self._torch
+        n = ids.numel()
+        # Reference cartpole reset: dof positions ~U(-0.1, 0.1), vels ~U(-0.25, 0.25).
+        self._dof[ids, :, 0] = 0.2 * (torch.rand(n, NUM_DOFS, device=self.device) - 0.5)
+        self._dof[ids, :, 1] = 0.5 * (torch.rand(n, NUM_DOFS, device=self.device) - 0.5)
+        self.sim.set_dof_state_tensor_indexed(self._dof, ids)
+        self.progress_buf[ids] = 0.0
 
 
 def _diag_dof_mapping(task):
