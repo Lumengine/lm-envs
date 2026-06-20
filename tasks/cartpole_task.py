@@ -46,15 +46,15 @@ class CartpoleTask(rl.VecTask):
     """Vectorized cartpole on the USD world (fixed-base slider + pole), on rl.VecTask:
     the base owns the step/reset loop; this fills the five task hooks."""
 
-    def __init__(self, num_envs=NUM_ENVS, headless=True):
+    def __init__(self, num_envs=NUM_ENVS, headless=True, num_states=0):
         rl.author_world(_ROBOT_USD, _WORLD_USD, num_envs=int(num_envs), spacing=ENV_SPACING)
         sim, runner = rl.create_world(
             _WORLD_USD, num_envs=int(num_envs), dofs_per_actor=NUM_DOFS,
             config=rl.SimConfig(substeps=2, device="auto"),
             headless=headless, title="Cartpole (rl_games)")
         sim.play()
-        super().__init__(sim, runner, num_obs=4, num_actions=1, name="Cartpole",
-                         clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,
+        super().__init__(sim, runner, num_obs=4, num_actions=1, num_states=int(num_states),
+                         name="Cartpole", clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,
                          seed=int(os.environ.get("LM_RL_SEED", "0")))
         self._dof = None
 
