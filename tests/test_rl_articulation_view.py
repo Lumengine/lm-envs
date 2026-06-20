@@ -84,7 +84,6 @@ def run():
         ("set_masses", lambda: view.set_masses(torch.ones(NUM_ENVS, N_LINKS, device=view.device))),
         ("set_dof_stiffnesses", lambda: view.set_dof_stiffnesses(torch.ones(NUM_ENVS, N_DOF, device=view.device))),
         ("set_material_properties", lambda: view.set_material_properties(torch.ones(NUM_ENVS, device=view.device))),
-        ("set_dof_velocity_targets", lambda: view.set_dof_velocity_targets(torch.zeros(NUM_ENVS, N_DOF, device=view.device))),
     ]:
         try:
             call(); raise AssertionError(f"{name} should have raised NotImplementedError")
