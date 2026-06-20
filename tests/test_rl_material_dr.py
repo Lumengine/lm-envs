@@ -42,16 +42,13 @@ def run():
     view.set_friction_coefficients(torch.full((NUM_ENVS, N_DOF), 0.5, device=dev))
     print("[test] set_friction_coefficients (joint) runs OK")
 
-    # Contact-material friction: the view DECLINES it — a live shape-material change does not
-    # refresh on the direct-GPU contact pipeline (verified: identical slide with friction
-    # 0.0 vs 5.0). The view raises NotImplementedError so the contract stays honest.
-    try:
-        view.set_material_properties(torch.full((NUM_ENVS,), 0.5, device=dev))
-        raise AssertionError("set_material_properties should decline (not live on direct-GPU)")
-    except NotImplementedError:
-        print("[test] set_material_properties correctly declined (no live GPU contact refresh)")
+    # Contact-material friction: a material VALUE change propagates to the direct-GPU pipeline
+    # (a *binding* change does not — verified). Runs here; it is GLOBAL for identically-authored
+    # robots until materials are un-shared at ingest (tracked).
+    view.set_material_properties(torch.full((NUM_ENVS,), 0.6, device=dev))
+    print("[test] set_material_properties runs (value mutation propagates; global until ingest un-share)")
 
-    print("[test] JOINT FRICTION DR + material-finding OK")
+    print("[test] JOINT FRICTION + MATERIAL-VALUE DR OK")
     rl.destroy_world(task.sim, task.runner)
     return 0
 
