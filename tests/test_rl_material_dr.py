@@ -42,13 +42,23 @@ def run():
     view.set_friction_coefficients(torch.full((NUM_ENVS, N_DOF), 0.5, device=dev))
     print("[test] set_friction_coefficients (joint) runs OK")
 
-    # Contact-material friction: a material VALUE change propagates to the direct-GPU pipeline
-    # (a *binding* change does not — verified). Runs here; it is GLOBAL for identically-authored
-    # robots until materials are un-shared at ingest (tracked).
-    view.set_material_properties(torch.full((NUM_ENVS,), 0.6, device=dev))
-    print("[test] set_material_properties runs (value mutation propagates; global until ingest un-share)")
+    # Contact-material friction is now PER-ENV: the ingest un-shares the default material into a
+    # per-articulation copy at build, so mutating each env's material value gives independent
+    # friction. Half the envs frictionless, half grippy; the frictionless ones slide further.
+    fr = torch.tensor([0.0] * (NUM_ENVS // 2) + [5.0] * (NUM_ENVS - NUM_ENVS // 2), device=dev)
+    view.set_material_properties(fr)
+    root = view.get_root_states().clone(); root[:, 7] = 2.5; root[:, 8:13] = 0.0
+    view.set_root_states(root)
+    xy0 = view.get_root_states()[:, 0:2].clone()
+    for _ in range(45):
+        sim.simulate(); sim.fetch_results()
+    dist = (view.get_root_states()[:, 0:2] - xy0).norm(dim=1)
+    lo = float(dist[:NUM_ENVS // 2].mean()); hi = float(dist[NUM_ENVS // 2:].mean())
+    print(f"[test] per-env friction slide: low(0.0)={lo:.3f} > high(5.0)={hi:.3f}")
+    assert lo > hi + 0.03, f"per-env contact friction not differentiating: low={lo} high={hi}"
+    print("[test] -> per-env contact friction works (ingest material un-sharing)")
 
-    print("[test] JOINT FRICTION + MATERIAL-VALUE DR OK")
+    print("[test] PER-ENV MATERIAL + JOINT FRICTION DR OK")
     rl.destroy_world(task.sim, task.runner)
     return 0
 

@@ -79,17 +79,14 @@ def run():
     print(f"[test] apply_link_forces effect: dz(mean)={float((z1 - z0).mean()):+.3f} m (should be > 0)")
     assert float((z1 - z0).mean()) > 0.05, "upward link force did not lift the robots"
 
-    # Unbacked DR property setters must raise NotImplementedError (the contract).
-    for name, call in [
-        ("set_masses", lambda: view.set_masses(torch.ones(NUM_ENVS, N_LINKS, device=view.device))),
-        ("set_dof_stiffnesses", lambda: view.set_dof_stiffnesses(torch.ones(NUM_ENVS, N_DOF, device=view.device))),
-        ("set_material_properties", lambda: view.set_material_properties(torch.ones(NUM_ENVS, device=view.device))),
-    ]:
-        try:
-            call(); raise AssertionError(f"{name} should have raised NotImplementedError")
-        except NotImplementedError:
-            pass
-    print("[test] unbacked DR setters correctly raise NotImplementedError")
+    # DR property setters are now all backed (mass/stiffness/damping/armature/joint+contact
+    # friction). Only get_masses (read-back) remains an explicit stub.
+    try:
+        view.get_masses()
+        raise AssertionError("get_masses should raise NotImplementedError (read-back not surfaced)")
+    except NotImplementedError:
+        pass
+    print("[test] get_masses still an explicit stub (read-back); all DR setters backed")
 
     print("[test] LAYER1 ArticulationView OK")
     rl.destroy_world(task.sim, task.runner)
