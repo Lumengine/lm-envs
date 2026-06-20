@@ -24,8 +24,8 @@ runs/                  gitignored — rl_games checkpoints
 ## Setup
 
 1. Build the **Lumengine engine** so `lm.rl` is deployed to `build/<cfg>/python`.
-2. Point this repo at it (or keep it a sibling `Lumengine2` next to `LumengineEnvs`):
-   `set LUMENGINE_ROOT=...\Lumengine2`
+2. Point this repo at the engine (required — no implicit discovery):
+   `set LUMENGINE_ROOT=C:\path\to\Lumengine2`
 3. GPU batch needs the shared CUDA context: `set LM_PHYSX_SHARE_CUDA_CONTEXT=1`.
 
 ## Anymal asset (regenerate — not vendored)

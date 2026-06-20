@@ -18,15 +18,10 @@ ASSETS = Path(__file__).resolve().parents[1] / "assets"
 def bootstrap():
     root = os.environ.get("LUMENGINE_ROOT")
     if not root:
-        side = Path(__file__).resolve().parents[2]   # dir containing this repo
-        for cand in (side / "Lumengine2", side / "Lumengine"):
-            if (cand / "build").exists():
-                root = cand
-                break
-    if not root:
         raise RuntimeError(
-            "LumengineEnvs: set LUMENGINE_ROOT to the Lumengine repo (the one with "
-            "build/<cfg>/python); no sibling Lumengine2/Lumengine was found.")
+            "LumengineEnvs: LUMENGINE_ROOT is not set. Point it at the Lumengine "
+            "engine repo (the one with build/<cfg>/python), e.g.\n"
+            "    set LUMENGINE_ROOT=C:\\path\\to\\Lumengine2")
     cfg = os.environ.get("LUMENGINE_BUILD_CONFIG", "Release")
     build_dir = Path(root) / "build" / cfg
     python_dir = build_dir / "python"
