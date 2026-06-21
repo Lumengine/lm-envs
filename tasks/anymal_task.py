@@ -81,13 +81,14 @@ class AnymalTask(rl.VecTask):
 
     def __init__(self, num_envs=NUM_ENVS, headless=True):
         prep_anymal_usd.main()   # floating base + PD drives (idempotent)
-        # instanceable=True: share ONE composed robot prototype across all envs instead of
-        # expanding the 60-link subtree per env. At 2048 envs that is the difference between a
-        # ~530k-prim stage (~20 GB RAM) and a ~2k-prim one. Anymal uses the default physics
-        # material, so per-env friction DR still works (build-time per-articulation un-sharing);
-        # the per-env collision id + root pose live on the instance prim, so they stay per-env.
+        # instanceable shares ONE composed robot prototype across all envs instead of expanding
+        # the 60-link subtree per env (at 2048: ~530k-prim stage / ~20 GB RAM -> ~2k prims).
+        # Anymal uses the default physics material so per-env friction DR still works (build-time
+        # per-articulation un-sharing); the per-env collision id + root pose live on the instance
+        # prim. ONLY when headless: the windowed render delegate does not draw USD instance
+        # proxies, so the viewer would show an empty scene -> use real prims when rendering.
         rl.author_world(_ROBOT, _WORLD, num_envs=int(num_envs), spacing=ENV_SPACING,
-                        ground=True, ground_z=GROUND_Z, spawn_z=0.0, instanceable=True)
+                        ground=True, ground_z=GROUND_Z, spawn_z=0.0, instanceable=bool(headless))
         # Scale the GPU contact-pair buffer with env count so large-N runs (1k-4k) don't
         # overflow PhysX's default ~1M contact cap (12-DOF legged robot on a ground plane).
         sim, runner = rl.create_world(
