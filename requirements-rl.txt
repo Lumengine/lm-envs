@@ -1,0 +1,16 @@
+# RL trainer dependencies for LumengineEnvs (lm.rl adapters).
+# Each trainer is optional and lazily imported — install only what you use.
+#
+# rl_games is the default (ships with the engine env). rsl_rl + skrl are the
+# Phase-0 peer trainers selected via LM_RL_TRAINER={rl_games,rsl_rl,skrl}.
+
+rsl-rl-lib==2.2.4   # PyPI name is rsl-rl-lib (NOT rsl-rl-rl); stay on 2.x (5.x uses TensorDict obs)
+skrl==1.4.3         # stay on 1.x (2.x removed the Isaac Gym wrappers)
+gym==0.26.2         # legacy gym, REQUIRED by skrl's isaacgym-preview4 wrapper (classic gym.spaces)
+
+# !! CUDA TORCH FOOTGUN !!
+# `pip install` of the above pulls a CPU torch from PyPI and will UNINSTALL an
+# existing CUDA build (e.g. torch 2.5.1+cu121). Install the rl libs with --no-deps,
+# or reinstall the CUDA torch afterwards:
+#   pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+# Always re-check `python -c "import torch; print(torch.cuda.is_available())"` after.

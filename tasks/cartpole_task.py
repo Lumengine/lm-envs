@@ -167,7 +167,8 @@ def _frame_camera(task):
 if __name__ == "__main__":
     play_ckpt = os.environ.get("LM_RL_PLAY")          # path to a .pth -> watch it windowed
     diag = os.environ.get("LM_RL_DIAG")
-    view = os.environ.get("LM_RL_VIEW") == "1"        # windowed: watch rl_games train live
+    view = os.environ.get("LM_RL_VIEW") == "1"        # windowed: watch training live
+    trainer = os.environ.get("LM_RL_TRAINER", "rl_games")  # rl_games | rsl_rl | skrl
     force_headless = os.environ.get("LM_RL_HEADLESS") == "1"
     headless = force_headless or not (play_ckpt or view)
     task = CartpoleTask(num_envs=NUM_ENVS, headless=headless)
@@ -183,14 +184,24 @@ if __name__ == "__main__":
         if not headless:
             _frame_camera(task)
         if play_ckpt:
-            # Deterministic (no action noise) and keep playing many episodes so the
-            # window stays up to watch; closing the window stops it gracefully.
-            games_num = int(os.environ.get("LM_RL_GAMES", "100000"))
-            deterministic = os.environ.get("LM_RL_DETERMINISTIC", "1") != "0"
-            rl.play(task, play_ckpt, params={"params": {"config": {
-                "player": {"games_num": games_num, "deterministic": deterministic, "render": False}}}})
+            if trainer == "rsl_rl":
+                rl.play_rsl_rl(task, play_ckpt)
+            elif trainer == "skrl":
+                rl.play_skrl(task, play_ckpt, headless=headless)
+            else:
+                # Deterministic (no action noise) and keep playing many episodes so the
+                # window stays up to watch; closing the window stops it gracefully.
+                games_num = int(os.environ.get("LM_RL_GAMES", "100000"))
+                deterministic = os.environ.get("LM_RL_DETERMINISTIC", "1") != "0"
+                rl.play_rl_games(task, play_ckpt, params={"params": {"config": {
+                    "player": {"games_num": games_num, "deterministic": deterministic, "render": False}}}})
+        elif trainer == "rsl_rl":
+            rl.train_rsl_rl(task, max_iterations=int(os.environ.get("LM_RL_EPOCHS", "200")), seed=0)
+        elif trainer == "skrl":
+            rl.train_skrl(task, timesteps=int(os.environ.get("LM_RL_TIMESTEPS", "100000")),
+                          seed=0, headless=headless)
         else:
-            rl.train(task, max_epochs=int(os.environ.get("LM_RL_EPOCHS", "200")), seed=0)
+            rl.train_rl_games(task, max_epochs=int(os.environ.get("LM_RL_EPOCHS", "200")), seed=0)
     except BaseException:
         import traceback
         print("[task-dbg] run raised:")

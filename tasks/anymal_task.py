@@ -53,7 +53,7 @@ MAX_EPISODE_LENGTH = 1000
 # the ground = a fall (complements the height/upright test with a real contact signal).
 BASE_CONTACT_FAIL_N = float(os.environ.get("LM_RL_BASE_CONTACT_FAIL_N", "1.0"))
 
-# IsaacGymEnvs AnymalPPO.yaml training config, deep-merged into rl.train's base. The
+# IsaacGymEnvs AnymalPPO.yaml training config, deep-merged into rl.train_rl_games's base. The
 # default rl_games config is cartpole-sized ([32,32] MLP) — too small to represent a
 # coordinated gait, so a faithful reward still plateaus at "stand and survive". This is
 # the locomotion-sized network + the matching reward scale that lets Isaac learn from
@@ -87,8 +87,12 @@ class AnymalTask(rl.VecTask):
         # per-articulation un-sharing); the per-env collision id + root pose live on the instance
         # prim. ONLY when headless: the windowed render delegate does not draw USD instance
         # proxies, so the viewer would show an empty scene -> use real prims when rendering.
+        # LM_RL_INSTANCE forces instancing on/off (test hook for the windowed render path);
+        # default: only headless (training), real prims when rendering.
+        _inst_env = os.environ.get("LM_RL_INSTANCE")
+        _instanceable = bool(headless) if _inst_env is None else (_inst_env == "1")
         rl.author_world(_ROBOT, _WORLD, num_envs=int(num_envs), spacing=ENV_SPACING,
-                        ground=True, ground_z=GROUND_Z, spawn_z=0.0, instanceable=bool(headless))
+                        ground=True, ground_z=GROUND_Z, spawn_z=0.0, instanceable=_instanceable)
         # Scale the GPU contact-pair buffer with env count so large-N runs (1k-4k) don't
         # overflow PhysX's default ~1M contact cap (12-DOF legged robot on a ground plane).
         sim, runner = rl.create_world(
@@ -188,6 +192,17 @@ class AnymalTask(rl.VecTask):
         self.reset_buf = fail.float()
 
         self._nstep += 1
+        # Instanced fleet (LM_RL_INSTANCE=1): once instancing has resolved (a few rendered
+        # frames) AND the articulations are built (a few steps), bind the shared render
+        # copies to the per-env articulation poses so the geometry animates per-env.
+        if self._nstep == 10 and not getattr(self, "_driven", False):
+            self._driven = True
+            try:
+                import lm.physx as _physx
+                n = _physx.drive_instanced_articulations(self.sim.scene)
+                print(f"[anymal-dbg] drive_instanced_articulations -> {n} prototype(s) driven", flush=True)
+            except Exception as _e:
+                print(f"[anymal-dbg] drive_instanced_articulations failed: {_e}", flush=True)
         if self._nstep % 500 == 0:
             cmd = self._commands.mean(0)
             print(f"[anymal-dbg] step {self._nstep} | ep_len(mean)={float(self.progress_buf.mean()):.1f} "
@@ -246,6 +261,7 @@ if __name__ == "__main__":
     play_ckpt = os.environ.get("LM_RL_PLAY")
     view = os.environ.get("LM_RL_VIEW") == "1"
     headless = os.environ.get("LM_RL_HEADLESS") == "1" or not (play_ckpt or view)
+    trainer = os.environ.get("LM_RL_TRAINER", "rl_games")  # rl_games | rsl_rl | skrl
     task = AnymalTask(num_envs=NUM_ENVS, headless=headless)
     try:
         if not headless:
@@ -254,18 +270,29 @@ if __name__ == "__main__":
             if hasattr(task.runner, "set_ui_callback"):
                 task.runner.set_ui_callback(lambda: _draw_drive(task))
         if play_ckpt:
-            games = int(os.environ.get("LM_RL_GAMES", "100000"))
-            # Must rebuild the SAME network the checkpoint was trained with
-            # ([256,128,64]) or the state_dict load mismatches — so play reuses
-            # ANYMAL_PPO_PARAMS and just adds the player config.
-            import copy
-            pp = copy.deepcopy(ANYMAL_PPO_PARAMS)
-            pp["params"]["config"]["player"] = {
-                "games_num": games, "deterministic": True, "render": False}
-            rl.play(task, play_ckpt, params=pp)
+            if trainer == "rsl_rl":
+                rl.play_rsl_rl(task, play_ckpt)
+            elif trainer == "skrl":
+                rl.play_skrl(task, play_ckpt, headless=headless)
+            else:
+                games = int(os.environ.get("LM_RL_GAMES", "100000"))
+                # Must rebuild the SAME network the checkpoint was trained with
+                # ([256,128,64]) or the state_dict load mismatches — so play reuses
+                # ANYMAL_PPO_PARAMS and just adds the player config.
+                import copy
+                pp = copy.deepcopy(ANYMAL_PPO_PARAMS)
+                pp["params"]["config"]["player"] = {
+                    "games_num": games, "deterministic": True, "render": False}
+                rl.play_rl_games(task, play_ckpt, params=pp)
+        elif trainer == "rsl_rl":
+            # ANYMAL_PPO_PARAMS is rl_games-specific; rsl_rl/skrl use their own defaults.
+            rl.train_rsl_rl(task, max_iterations=int(os.environ.get("LM_RL_EPOCHS", "1500")), seed=0)
+        elif trainer == "skrl":
+            rl.train_skrl(task, timesteps=int(os.environ.get("LM_RL_TIMESTEPS", "1000000")),
+                          seed=0, headless=headless)
         else:
-            rl.train(task, max_epochs=int(os.environ.get("LM_RL_EPOCHS", "1500")), seed=0,
-                     horizon_length=24, mini_epochs=5, params=ANYMAL_PPO_PARAMS)
+            rl.train_rl_games(task, max_epochs=int(os.environ.get("LM_RL_EPOCHS", "1500")), seed=0,
+                              horizon_length=24, mini_epochs=5, params=ANYMAL_PPO_PARAMS)
     except BaseException:
         import traceback; print("[anymal-dbg] run raised:"); traceback.print_exc()
     finally:

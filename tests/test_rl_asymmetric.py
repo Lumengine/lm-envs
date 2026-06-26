@@ -55,7 +55,7 @@ def run():
 
     # Integration: a short train must run end-to-end with the central value enabled
     # (a wrong state_space / obs-dict / cv-config would crash rl_games here).
-    rl.train(task, max_epochs=3, seed=0)
+    rl.train_rl_games(task, max_epochs=3, seed=0)
     print("[test] short asymmetric train completed (central value consumed)")
 
     print("[test] ASYMMETRIC ACTOR-CRITIC OK")
