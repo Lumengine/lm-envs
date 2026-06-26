@@ -89,10 +89,19 @@ class AnymalTask(rl.VecTask):
         # default: only headless (training), real prims when rendering.
         _inst_env = os.environ.get("LM_RL_INSTANCE")
         instanceable = bool(headless) if _inst_env is None else (_inst_env == "1")
-        # USD-native World: shared ground + the anymal morph. The morph's config-driven prep
-        # (assets/anymal_c.rl.yaml) frees the base and authors the 12 PD DriveAPI joints.
+        # USD-native World: shared ground/terrain + the anymal morph. The morph's
+        # config-driven prep (assets/anymal_c.rl.yaml) frees the base and authors the 12
+        # PD DriveAPI joints. LM_RL_TERRAIN=1 swaps the flat ground for procedural noise
+        # terrain (amplitude LM_RL_TERRAIN_AMP, default 0.10 m) — gentle, so the fixed
+        # spawn height still clears it (per-env spawn-from-terrain is a later increment).
         self.world = rl.World(num_envs=int(num_envs), env_spacing=ENV_SPACING)
-        self.world.add_ground(z=GROUND_Z, friction=1.0)
+        if os.environ.get("LM_RL_TERRAIN"):
+            amp = float(os.environ.get("LM_RL_TERRAIN_AMP", "0.10"))
+            cells = int(os.environ.get("LM_RL_TERRAIN_CELLS", "4"))   # more = tighter, steeper hills
+            self.world.add_terrain(rl.terrain.Noise(amplitude=amp, base_cells=cells, seed=0),
+                                   friction=1.0, base_z=GROUND_Z)
+        else:
+            self.world.add_ground(z=GROUND_Z, friction=1.0)
         self.robot = self.world.add_robot(
             rl.Usd(str(_ROBOT), prep=True, config=str(_CFG)), spawn_z=0.0)
         # Scale the GPU contact-pair buffer with env count so large-N runs (1k-4k) don't
