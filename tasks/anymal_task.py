@@ -1,9 +1,9 @@
 """ANYmal velocity-command locomotion on the USD world, trained by rl_games.
 
-Production path (mirrors Samples/RlCartpoleUsd/cartpole_task.py): a VecTask-shaped
-task the rl_games adapter (lm.rl/_rlgames.py) drives. The robot is the REAL anymal_c
-(anymal.urdf -> USD via urdf_usd_converter, prepped to floating base + PD drives by
-prep_anymal_usd.py). Task = IsaacGymEnvs Anymal: track a commanded base velocity
+Production path: a VecTask-shaped task the rl_games adapter (lm.rl/_rlgames.py) drives.
+The robot is the REAL anymal_c (anymal.urdf -> USD via urdf_usd_converter), authored via
+the rl.World facade; floating base + PD drives are applied by lm.rl's config-driven prep
+from assets/anymal_c.rl.yaml. Task = IsaacGymEnvs Anymal: track a commanded base velocity
 (lin x/y + yaw) sampled per episode, under PD position control. Z-up.
 
     set LM_PHYSX_SHARE_CUDA_CONTEXT=1
@@ -23,16 +23,15 @@ import sys
 from pathlib import Path
 
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))   # _bootstrap + prep_anymal_usd
+sys.path.insert(0, str(Path(__file__).resolve().parent))   # _bootstrap
 import _bootstrap
 _bootstrap.bootstrap()
 import lm.rl as rl
-import prep_anymal_usd
 
 faulthandler.enable()
 
 _ROBOT = _bootstrap.ASSETS / "anymal_converted" / "anymal.usda"
-_WORLD = _bootstrap.ASSETS / "world_anymal_train.usd"   # generated (gitignored)
+_CFG   = _bootstrap.ASSETS / "anymal_c.rl.yaml"   # floating base + PD drives (config-driven prep)
 
 NUM_ENVS    = int(os.environ.get("LM_RL_NUM_ENVS", "256"))
 ENV_SPACING = float(os.environ.get("LM_RL_SPACING", "4.0"))
@@ -80,7 +79,6 @@ class AnymalTask(rl.VecTask):
     loop; the hooks below define the obs/reward/reset and the PD-target action."""
 
     def __init__(self, num_envs=NUM_ENVS, headless=True):
-        prep_anymal_usd.main()   # floating base + PD drives (idempotent)
         # instanceable shares ONE composed robot prototype across all envs instead of expanding
         # the 60-link subtree per env (at 2048: ~530k-prim stage / ~20 GB RAM -> ~2k prims).
         # Anymal uses the default physics material so per-env friction DR still works (build-time
@@ -90,16 +88,20 @@ class AnymalTask(rl.VecTask):
         # LM_RL_INSTANCE forces instancing on/off (test hook for the windowed render path);
         # default: only headless (training), real prims when rendering.
         _inst_env = os.environ.get("LM_RL_INSTANCE")
-        _instanceable = bool(headless) if _inst_env is None else (_inst_env == "1")
-        rl.author_world(_ROBOT, _WORLD, num_envs=int(num_envs), spacing=ENV_SPACING,
-                        ground=True, ground_z=GROUND_Z, spawn_z=0.0, instanceable=_instanceable)
+        instanceable = bool(headless) if _inst_env is None else (_inst_env == "1")
+        # USD-native World: shared ground + the anymal morph. The morph's config-driven prep
+        # (assets/anymal_c.rl.yaml) frees the base and authors the 12 PD DriveAPI joints.
+        self.world = rl.World(num_envs=int(num_envs), env_spacing=ENV_SPACING)
+        self.world.add_ground(z=GROUND_Z, friction=1.0)
+        self.robot = self.world.add_robot(
+            rl.Usd(str(_ROBOT), prep=True, config=str(_CFG)), spawn_z=0.0)
         # Scale the GPU contact-pair buffer with env count so large-N runs (1k-4k) don't
         # overflow PhysX's default ~1M contact cap (12-DOF legged robot on a ground plane).
-        sim, runner = rl.create_world(
-            _WORLD, num_envs=int(num_envs), dofs_per_actor=N_DOF,
+        sim, runner = self.world.build(
+            headless=headless, instanceable=instanceable,
             config=rl.SimConfig(substeps=SUBSTEPS, device="auto",
                                 gpu_contact_buffer_multiplier=max(1.0, int(num_envs) / 512.0)),
-            headless=headless, title="ANYmal (rl_games, vel-cmd)")
+            title="ANYmal (rl_games, vel-cmd)")
         sim.play()
         super().__init__(sim, runner, num_obs=48, num_actions=N_DOF, name="Anymal",
                          clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,
@@ -115,9 +117,11 @@ class AnymalTask(rl.VecTask):
         self._root = self.sim.acquire_root_state_tensor()
         self._contact = self.sim.acquire_link_net_contact_force_tensor()   # (envs, links, 3)
         self.sim.refresh_dof_state_tensor(); self.sim.refresh_root_state_tensor()
-        # PD-held stance + stand height are the references (DOF order opaque in the
-        # 60-link tree; the settled state IS the default, in batch order).
-        self._default_dof = self._dof[:, :N_DOF, 0].clone()
+        # Authored PD stance from anymal_c.rl.yaml, in engine DOF order (via the RobotView
+        # name->index map) — no longer inferred from the settled state. Per-env shape
+        # (num_envs, N_DOF) so the reset (which indexes [ids]) and obs/action broadcasting
+        # all work unchanged.
+        self._default_dof = self.robot.default_dof_positions.unsqueeze(0).repeat(self.num_envs, 1)
         self._world_down = torch.tensor([0.0, 0.0, -1.0], device=dev).repeat(self.num_envs, 1)
         self._cmd_scale = torch.tensor([LIN_VEL_SCALE, LIN_VEL_SCALE, ANG_VEL_SCALE], device=dev)
         self._prev_action = torch.zeros(self.num_envs, N_DOF, device=dev)

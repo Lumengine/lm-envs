@@ -1,9 +1,9 @@
 """Cartpole vectorized task on the USD world, trained by rl_games (Phase 0 spike).
 
 A `VecTask`-shaped task (the adapter in lm.rl/_rlgames.py wraps it for rl_games):
-builds the USD world via rl.author_world + rl.create_world, exposes reset()/step()
-over the RlSim GPU tensors, and reports failure vs timeout so the trainer bootstraps
-correctly. Run headless:
+builds the USD world via the rl.World facade (fixed-base, force-controlled), exposes
+reset()/step() over the RlSim GPU tensors, and reports failure vs timeout so the
+trainer bootstraps correctly. Run headless:
 
     set LM_PHYSX_SHARE_CUDA_CONTEXT=1
     python Samples/RlCartpoleUsd/cartpole_task.py
@@ -25,7 +25,6 @@ faulthandler.enable()
 
 _ROBOT_USD  = Path(os.environ.get(
     "LM_RL_ROBOT_USD", str(_bootstrap.ASSETS / "cartpole_converted" / "cartpole.usda")))
-_WORLD_USD  = _bootstrap.ASSETS / "world.usd"   # generated (gitignored)
 
 NUM_ENVS    = int(os.environ.get("LM_RL_NUM_ENVS", "512"))
 # Envs share ONE PhysicsScene but never collide across cells: author_world marks each
@@ -47,11 +46,12 @@ class CartpoleTask(rl.VecTask):
     the base owns the step/reset loop; this fills the five task hooks."""
 
     def __init__(self, num_envs=NUM_ENVS, headless=True, num_states=0, config=None):
-        rl.author_world(_ROBOT_USD, _WORLD_USD, num_envs=int(num_envs), spacing=ENV_SPACING)
-        sim, runner = rl.create_world(
-            _WORLD_USD, num_envs=int(num_envs), dofs_per_actor=NUM_DOFS,
-            config=config or rl.SimConfig(substeps=2, device="auto"),
-            headless=headless, title="Cartpole (rl_games)")
+        # Fixed-base, force-controlled: no ground, no PD prep (prep=False), DOFs by index.
+        self.world = rl.World(num_envs=int(num_envs), env_spacing=ENV_SPACING)
+        self.world.add_robot(rl.Usd(str(_ROBOT_USD), prep=False, num_dofs=NUM_DOFS))
+        sim, runner = self.world.build(
+            headless=headless, config=config or rl.SimConfig(substeps=2, device="auto"),
+            title="Cartpole (rl_games)")
         sim.play()
         super().__init__(sim, runner, num_obs=4, num_actions=1, num_states=int(num_states),
                          name="Cartpole", clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,

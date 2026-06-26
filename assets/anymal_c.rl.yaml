@@ -1,0 +1,27 @@
+# anymal_c — control + RL prep for the converted ANYmal C USD (IsaacGymEnvs parity).
+# Read by lm.rl's config-driven prep: it deactivates the converter's root_joint
+# (-> floating base) and authors a UsdPhysics PD DriveAPI on the 12 actuated joints.
+# The converted USD (assets/anymal_converted/, gitignored) stays pristine — prep
+# writes a prepped copy into the morph cache. Constructor args on rl.Urdf/rl.Usd
+# override these defaults.
+
+floating_base: true                  # free the base for locomotion
+
+default_joint_angles:                # PD targets / reset stance (radians), by joint NAME
+  LF_HAA: 0.03
+  LF_HFE: 0.4
+  LF_KFE: -0.8
+  RF_HAA: -0.03
+  RF_HFE: 0.4
+  RF_KFE: -0.8
+  LH_HAA: 0.03
+  LH_HFE: -0.4
+  LH_KFE: 0.8
+  RH_HAA: -0.03
+  RH_HFE: -0.4
+  RH_KFE: 0.8
+
+actuated_joints: ["*_HAA", "*_HFE", "*_KFE"]   # the 12 leg joints
+
+drive:                               # IsaacGym anymal PD gains + URDF effort limit
+  default: { stiffness: 85.0, damping: 2.0, max_force: 80.0, drive_type: force }
