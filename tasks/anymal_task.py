@@ -102,6 +102,14 @@ class AnymalTask(rl.VecTask):
                                    friction=1.0, base_z=GROUND_Z)
         else:
             self.world.add_ground(z=GROUND_Z, friction=1.0)
+        # LM_RL_SCATTER=N scatters N cylinder obstacles per env (concrete colliders),
+        # kept clear of the robot spawn. Demonstrates the World scatter; the flat-ground
+        # policy isn't obstacle-aware, so it bumps into them (they're solid).
+        n_scatter = int(os.environ.get("LM_RL_SCATTER", "0"))
+        if n_scatter > 0:
+            self.world.scatter(rl.Cylinder(radius=0.2, height=0.8, color=(0.7, 0.4, 0.2)),
+                               count=n_scatter, area=(2.5, 2.5), z=GROUND_Z + 0.4,
+                               per_env=True, seed=0, clearance=1.2)
         self.robot = self.world.add_robot(
             rl.Usd(str(_ROBOT), prep=True, config=str(_CFG)), spawn_z=0.0)
         # Scale the GPU contact-pair buffer with env count so large-N runs (1k-4k) don't
