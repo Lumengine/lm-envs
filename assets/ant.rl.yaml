@@ -1,0 +1,21 @@
+# ant — control + RL prep for the converted MuJoCo ant (via mujoco-usd-converter).
+# Demonstrates the MJCF import path (rl.Mjcf): the converter writes a pristine USD
+# articulation; this config drives lm.rl's prep to free the base and author UsdPhysics
+# PD DriveAPI on the 8 leg joints (hip + ankle x 4).
+
+floating_base: true                  # the torso free-joint is the floating base
+
+default_joint_angles:                # PD targets / reset stance (radians), by joint NAME.
+  hip_1: 0.0                         # hips: mid of [-30,30] deg = 0
+  ankle_1: 0.87                      # ankles bent DOWN (feet to the ground); ranges exclude 0:
+  hip_2: 0.0                         #   ankle_1/4 in [30,70] deg -> +0.87 rad (~50 deg)
+  ankle_2: -0.87                     #   ankle_2/3 in [-70,-30] deg -> -0.87 rad
+  hip_3: 0.0
+  ankle_3: -0.87
+  hip_4: 0.0
+  ankle_4: 0.87
+
+actuated_joints: ["hip_*", "ankle_*"]          # the 8 leg joints
+
+drive:
+  default: { stiffness: 40.0, damping: 2.0, max_force: 60.0, drive_type: force }
