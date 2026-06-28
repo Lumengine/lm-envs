@@ -91,11 +91,23 @@ class AnymalTask(rl.VecTask):
         instanceable = bool(headless) if _inst_env is None else (_inst_env == "1")
         # USD-native World: shared ground/terrain + the anymal morph. The morph's
         # config-driven prep (assets/anymal_c.rl.yaml) frees the base and authors the 12
-        # PD DriveAPI joints. LM_RL_TERRAIN=1 swaps the flat ground for procedural noise
-        # terrain (amplitude LM_RL_TERRAIN_AMP, default 0.10 m) — gentle, so the fixed
-        # spawn height still clears it (per-env spawn-from-terrain is a later increment).
+        # PD DriveAPI joints. LM_RL_TERRAIN_VARIANTS=1 gives each env one of K terrain types
+        # (USD variantSet) with per-env spawn-from-terrain; LM_RL_TERRAIN=1 is a single
+        # shared noise terrain (amplitude LM_RL_TERRAIN_AMP, default 0.10 m, gentle so the
+        # fixed spawn clears it); else flat ground.
         self.world = rl.World(num_envs=int(num_envs), env_spacing=ENV_SPACING)
-        if os.environ.get("LM_RL_TERRAIN"):
+        if os.environ.get("LM_RL_TERRAIN_VARIANTS"):
+            # Per-env terrain via a USD variantSet: each env SELECTS one of K terrain types
+            # (round_robin by default). Concrete per-env tiles (issue #95).
+            self.world.add_terrain_variants([
+                ("flat",   rl.terrain.Flat()),
+                ("noise",  rl.terrain.Noise(amplitude=0.18, base_cells=4, seed=0)),
+                ("slope",  rl.terrain.Slope(slope=0.15, axis="x")),
+                ("stairs", rl.terrain.Stairs(step_width=0.4, step_height=0.06)),
+            ], size_m=ENV_SPACING, friction=1.0, base_z=GROUND_Z)
+            self.world.assign_terrain(
+                strategy=os.environ.get("LM_RL_TERRAIN_STRATEGY", "round_robin"), seed=0)
+        elif os.environ.get("LM_RL_TERRAIN"):
             amp = float(os.environ.get("LM_RL_TERRAIN_AMP", "0.10"))
             cells = int(os.environ.get("LM_RL_TERRAIN_CELLS", "4"))   # more = tighter, steeper hills
             self.world.add_terrain(rl.terrain.Noise(amplitude=amp, base_cells=cells, seed=0),
@@ -143,11 +155,13 @@ class AnymalTask(rl.VecTask):
         self._cmd_scale = torch.tensor([LIN_VEL_SCALE, LIN_VEL_SCALE, ANG_VEL_SCALE], device=dev)
         self._prev_action = torch.zeros(self.num_envs, N_DOF, device=dev)
         self._commands = torch.zeros(self.num_envs, 3, device=dev)
-        stand_h = float(self._root[:, 2].mean())
-        self._h_min = stand_h * H_MIN_FRAC
+        # Per-env spawn pose: capture the ingest-time root x/y/z per env. With terrain
+        # variants each env's robot is lifted to its own terrain height, so reset AND the
+        # fall threshold are per-env — a uniform mean would re-explode robots on raised
+        # terrain when they reset.
+        self._h_min = self._root[:, 2] * H_MIN_FRAC
         home = torch.zeros(self.num_envs, 13, device=dev)
-        home[:, 0:2] = self._root[:, 0:2]
-        home[:, 2] = stand_h
+        home[:, 0:3] = self._root[:, 0:3]
         home[:, 6] = 1.0
         self._home = home
 
