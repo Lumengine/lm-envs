@@ -96,7 +96,23 @@ class AnymalTask(rl.VecTask):
         # shared noise terrain (amplitude LM_RL_TERRAIN_AMP, default 0.10 m, gentle so the
         # fixed spawn clears it); else flat ground.
         self.world = rl.World(num_envs=int(num_envs), env_spacing=ENV_SPACING)
-        if os.environ.get("LM_RL_TERRAIN_VARIANTS"):
+        self.curr = None   # terrain difficulty curriculum (set after super().__init__)
+        if os.environ.get("LM_RL_CURRICULUM"):
+            # Terrain difficulty curriculum: a static grid of (level x type) tiles; each env
+            # starts easy and is moved up/down levels at reset by how far it walked. Level l
+            # uses difficulty d = l/(L-1), harder = steeper slope / taller steps / more noise.
+            nlev = int(os.environ.get("LM_RL_CURRICULUM_LEVELS", "8"))
+            csize = float(os.environ.get("LM_RL_CURRICULUM_SIZE", "8.0"))   # tile side (m) — room
+            self.world.add_terrain_curriculum(                             # to walk + spread robots
+                types=[
+                    lambda d: rl.terrain.Slope(slope=0.05 + 0.45 * d, axis="x"),
+                    lambda d: rl.terrain.Stairs(step_height=0.02 + 0.10 * d,
+                                                step_width=0.4, platform=1.5),
+                    lambda d: rl.terrain.Noise(amplitude=0.04 + 0.30 * d, base_cells=4, seed=0),
+                ],
+                num_levels=nlev, max_init_level=int(os.environ.get("LM_RL_CURRICULUM_INIT", "1")),
+                size_m=csize, friction=1.0, base_z=GROUND_Z)
+        elif os.environ.get("LM_RL_TERRAIN_VARIANTS"):
             # Per-env terrain via a USD variantSet: each env SELECTS one of K terrain types
             # (round_robin by default). Concrete per-env tiles (issue #95).
             self.world.add_terrain_variants([
@@ -137,6 +153,9 @@ class AnymalTask(rl.VecTask):
                          seed=int(os.environ.get("LM_RL_SEED", "0")))
         self._nstep = 0
         self._drive = None   # set to the _DRIVE list (windowed play) -> live UI command
+        # Build the runtime terrain curriculum now that the device is resolved (None if
+        # LM_RL_CURRICULUM was not requested). _reset_idx drives the level promotion.
+        self.curr = self.world.make_terrain_curriculum(self.device)
 
     # -- task hooks ---------------------------------------------------------
 
@@ -240,14 +259,26 @@ class AnymalTask(rl.VecTask):
                 print(f"[anymal-dbg] drive_instanced_articulations failed: {_e}", flush=True)
         if self._nstep % 500 == 0:
             cmd = self._commands.mean(0)
+            curr_s = f" | curr_level(mean)={self.curr.mean_level():.2f}/{self.curr.max_level-1}" \
+                     if self.curr is not None else ""
             print(f"[anymal-dbg] step {self._nstep} | ep_len(mean)={float(self.progress_buf.mean()):.1f} "
                   f"| track_rew={float(self.rew_buf.mean()):.3f} | vx={float(self._lin_body[:,0].mean()):+.2f} "
                   f"(cmd_x~{float(cmd[0]):+.2f}) | upright={float(self._up_proj.mean()):.2f} "
                   f"| height={float(height.mean()):.2f} | base_contact>{BASE_CONTACT_FAIL_N:g}N="
-                  f"{int((base_contact > BASE_CONTACT_FAIL_N).sum())} | fails={int(fail.sum())}", flush=True)
+                  f"{int((base_contact > BASE_CONTACT_FAIL_N).sum())} | fails={int(fail.sum())}{curr_s}", flush=True)
 
     def _reset_idx(self, ids):
         torch = self._torch; n = ids.numel(); dev = self.device
+        if self.curr is not None:
+            # Terrain curriculum (mirrors IsaacLab's terrain_levels_vel): promote the env if
+            # it walked across its tile, demote if it barely moved, then respawn it on the
+            # (new) tile. _home + the per-env fall threshold follow the new tile height.
+            dist = (self._root[ids, 0:2] - self._home[ids, 0:2]).norm(dim=1)
+            move_up = dist > self.curr.size_m * 0.5
+            move_down = (dist < 0.5) & (~move_up)
+            self.curr.update(ids, move_up, move_down)
+            self._home[ids, 0:3] = self.curr.env_origins[ids]
+            self._h_min[ids] = self.curr.env_origins[ids, 2] * H_MIN_FRAC
         self._root[ids] = self._home[ids]
         self._dof[ids, :N_DOF, 0] = self._default_dof[ids] * (0.5 + torch.rand(n, N_DOF, device=dev))
         self._dof[ids, :N_DOF, 1] = (torch.rand(n, N_DOF, device=dev) - 0.5) * 0.2
