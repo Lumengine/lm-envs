@@ -140,12 +140,17 @@ class AnymalTask(rl.VecTask):
                                per_env=True, seed=0, clearance=1.2)
         self.robot = self.world.add_robot(
             rl.Usd(str(_ROBOT), prep=True, config=str(_CFG)), spawn_z=0.0)
-        # Scale the GPU contact-pair buffer with env count so large-N runs (1k-4k) don't
-        # overflow PhysX's default ~1M contact cap (12-DOF legged robot on a ground plane).
+        # Scale the GPU contact-pair / collision-stack buffers with env count so large-N runs
+        # (1k-4k) don't overflow PhysX defaults. The terrain curriculum needs MORE: its tiles
+        # are triangle-mesh colliders and many robots cluster on the same low-difficulty tile
+        # (lots of broadphase pairs + contacts), so bump the multiplier when it is active.
+        _gpu_mult = max(1.0, int(num_envs) / 512.0)
+        if os.environ.get("LM_RL_CURRICULUM"):
+            _gpu_mult = max(_gpu_mult, int(num_envs) / 256.0, 2.0)
         sim, runner = self.world.build(
             headless=headless, instanceable=instanceable,
             config=rl.SimConfig(substeps=SUBSTEPS, device="auto",
-                                gpu_contact_buffer_multiplier=max(1.0, int(num_envs) / 512.0)),
+                                gpu_contact_buffer_multiplier=_gpu_mult),
             title="ANYmal (rl_games, vel-cmd)")
         sim.play()
         super().__init__(sim, runner, num_obs=48, num_actions=N_DOF, name="Anymal",
