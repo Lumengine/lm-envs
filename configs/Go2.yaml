@@ -1,0 +1,9 @@
+# Unitree Go2 velocity-command locomotion (shared LeggedVelocityTask). Auto-loaded.
+# Override per-run: --num-envs / --seed, or --set key=value.
+num_envs: 4096
+env_spacing: 2.5
+seed: 0
+
+terrain: flat              # flat | noise | variants | curriculum
+instance: auto             # auto | on | off
+scatter: 0

@@ -18,7 +18,7 @@ downloaded by `scripts/fetch_assets.py` (not committed) · `planned` = not yet a
 | ANYmal-C | BSD-3-Clause (© ANYbotics AG) | github.com/ANYbotics/anymal_c_simple_description | fetched |
 | Humanoid | Apache-2.0 | DeepMind dm_control | planned |
 | Walker | Apache-2.0 | DeepMind dm_control / Genesis | planned |
-| Unitree Go2 | Apache-2.0 / BSD-3 | Unitree (unitree_ros) / Genesis | planned |
+| Unitree Go2 | BSD-3-Clause (© Unitree) | Unitree (unitree_ros) via Genesis; see assets/go2/LICENSE | vendored |
 | Unitree A1 / Go1 | BSD-3-Clause (© Unitree) | unitree_ros / MuJoCo Menagerie | planned |
 | Unitree B1 | BSD-3-Clause (© Unitree) | MuJoCo Menagerie | planned |
 | Unitree H1 / G1 | BSD-3-Clause (© Unitree) | unitree_ros / MuJoCo Menagerie | planned |

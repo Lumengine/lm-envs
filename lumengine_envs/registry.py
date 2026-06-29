@@ -14,7 +14,7 @@ Migration note: tasks currently live as top-level modules under `tasks/` (e.g.
 import importlib
 from dataclasses import dataclass, field
 
-from .config import AntConfig, AnymalConfig, CartpoleConfig
+from .config import AntConfig, AnymalConfig, CartpoleConfig, Go2Config
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,12 @@ REGISTRY: dict[str, TaskSpec] = {
         domain="locomotion", desc="ANYmal-C (URDF) - velocity-command walking (IsaacLab reward).",
         default_envs=4096, max_epochs=1500,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="ANYMAL_PPO_PARAMS"),
+
+    "Go2": TaskSpec(
+        id="Go2", module="legged_velocity", cls="LeggedVelocityTask", config_cls=Go2Config,
+        domain="locomotion", desc="Unitree Go2 (URDF) - velocity-command walking (shared legged task).",
+        default_envs=4096, max_epochs=1000,
+        train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 }
 
 

@@ -1,0 +1,8 @@
+Unitree Go2 robot description (URDF + meshes).
+
+Copyright (c) Unitree Robotics (HangZhou YuShu TECHNOLOGY CO., LTD.).
+Licensed under the BSD 3-Clause License.
+
+Origin: Unitree robot descriptions (unitree_ros / go2_description); obtained via the
+Genesis project (genesis-world, Apache-2.0). Redistributed here under the model's own
+BSD-3-Clause terms with attribution. See THIRD_PARTY_LICENSES.md.

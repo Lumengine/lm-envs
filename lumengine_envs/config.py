@@ -44,10 +44,25 @@ class AntConfig(BaseConfig):
 
 
 @dataclass
-class AnymalConfig(BaseConfig):
+class LeggedConfig(BaseConfig):
+    """Velocity-command quadruped locomotion — shared across legged robots. A specific
+    robot is just a subclass that overrides the asset/robot defaults below."""
     num_envs: int = 4096
     env_spacing: float = 4.0
+    # Robot identity (asset-relative paths under assets/). Morph type is inferred from the
+    # extension: .usd/.usda -> Usd, .urdf -> Urdf, .xml -> Mjcf.
+    name: str = "Legged"              # task name (checkpoint / run dir)
+    robot: str = ""
+    rl_yaml: str = ""                 # prep config (floating base + PD drives)
+    num_dof: int = 12
+    ground_z: float = -0.65           # ground plane height (so the feet rest on it)
+    spawn_z: float = 0.0
+    action_scale: float = 0.5         # target = action_scale * action + default stance
+    feet_air_time_threshold: float = 0.5   # swing-time (s) the foot-air-time reward credits past
+    foot_suffix: str = "FOOT"         # link-name suffix for feet (contact / air-time)
+    thigh_suffix: str = "THIGH"       # link-name suffix for the undesired/knee-contact links
     base_contact_fail_n: float = 1.0  # base/knee contact force (N) above which = a fall
+    upright_min: float = 0.5          # terminate if up-projection drops below this (tipped over)
     # "auto" = instanced only when headless (training); "on"/"off" force it.
     instance: str = "auto"
     # Terrain mode: "flat" | "noise" | "variants" | "curriculum".
@@ -59,6 +74,26 @@ class AnymalConfig(BaseConfig):
     curriculum_size: float = 8.0      # difficulty-tile side (m)
     curriculum_init: int = 1          # max initial difficulty level
     scatter: int = 0                  # N cylinder obstacles scattered per env (0 = none)
+
+
+@dataclass
+class AnymalConfig(LeggedConfig):
+    name: str = "Anymal"
+    robot: str = "anymal_converted/anymal.usda"
+    rl_yaml: str = "anymal_c.rl.yaml"
+    ground_z: float = -0.65
+    action_scale: float = 0.5
+
+
+@dataclass
+class Go2Config(LeggedConfig):
+    name: str = "Go2"
+    robot: str = "go2/urdf/go2.urdf"
+    rl_yaml: str = "go2.rl.yaml"
+    env_spacing: float = 2.5
+    ground_z: float = -0.40           # go2 is smaller than anymal (lower stance)
+    action_scale: float = 0.25        # Genesis go2 value
+    feet_air_time_threshold: float = 0.2   # go2 trots fast — short swing; don't punish it
 
 
 # ── layering helpers ─────────────────────────────────────────────────────────
