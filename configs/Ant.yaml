@@ -1,0 +1,11 @@
+# MuJoCo Ant run-forward (torque control). Auto-loaded by train.py/play.py.
+# Override per-run: --num-envs / --seed, or --set key=value.
+num_envs: 4096
+env_spacing: 2.5
+seed: 0
+
+torque_scale: 15.0         # action in [-1,1] -> joint torque (N*m)
+armature: 0.5              # per-DOF joint inertia (stability under torque control)
+spawn_z: 0.62              # spawn height (clear the feet off the ground)
+fall_drop: 0.5             # terminate if the base drops this far below spawn
+upright_min: 0.2           # terminate if the up-projection falls below this (flipped)

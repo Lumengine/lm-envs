@@ -1,0 +1,15 @@
+LumengineEnvs
+Copyright 2026 Lumengine
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This repository redistributes third-party robot models and assets that remain
+under their own licenses. Each vendored asset keeps its original LICENSE file in
+its assets/<asset>/ directory, and THIRD_PARTY_LICENSES.md lists every asset with
+its license and origin. Those third-party licenses (e.g. BSD-3-Clause, MIT,
+CC-BY-4.0) govern the corresponding asset files, not this repository's Apache-2.0
+license.
+
+No assets from NVIDIA Isaac Sim / Omniverse Nucleus are included or derived from;
+robot models are sourced from their upstream URDF/MJCF descriptions and converted
+to USD locally.

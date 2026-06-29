@@ -1,0 +1,5 @@
+# Cartpole balance. Auto-loaded by train.py/play.py.
+# Override per-run: --num-envs / --seed, or --set key=value.
+num_envs: 512
+seed: 0
+force_mag: 400.0           # action in [-1,1] -> [-force_mag, force_mag] N on the cart

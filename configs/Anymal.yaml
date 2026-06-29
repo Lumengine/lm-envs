@@ -1,0 +1,15 @@
+# ANYmal-C velocity-command locomotion. Auto-loaded by train.py/play.py.
+# Override per-run on the CLI: --num-envs / --seed, or --set key=value (any field).
+num_envs: 4096
+env_spacing: 4.0
+seed: 0
+
+# terrain: flat | noise | variants | curriculum
+terrain: flat
+terrain_amp: 0.10          # noise amplitude (m), for terrain=noise
+terrain_cells: 4           # noise base cells (more = tighter/steeper)
+
+# instance: auto | on | off   (auto = instanced only when headless/training)
+instance: auto
+scatter: 0                 # N cylinder obstacles per env (0 = none)
+base_contact_fail_n: 1.0   # base/knee contact (N) above which an episode fails
