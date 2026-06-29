@@ -17,5 +17,10 @@ default_joint_angles:                # PD targets / reset stance (radians), by j
 
 actuated_joints: ["hip_*", "ankle_*"]          # the 8 leg joints
 
+# TORQUE control (canonical MuJoCo-ant actuation): the policy outputs joint torques
+# directly (set_dof_actuation_force_tensor -> PhysX eJOINT_FORCE), so the PD drive is
+# inert — stiffness 0. A small drive damping gives the joints natural velocity damping
+# (like MuJoCo's joint damping=1) for numerical stability; max_force is large so it never
+# clips our applied torque. The task also sets a per-DOF armature at capture for stability.
 drive:
-  default: { stiffness: 40.0, damping: 2.0, max_force: 60.0, drive_type: force }
+  default: { stiffness: 0.0, damping: 0.5, max_force: 1000.0, drive_type: force }

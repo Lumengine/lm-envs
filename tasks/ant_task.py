@@ -1,13 +1,21 @@
-"""ANT — a velocity-tracking locomotion task on the MuJoCo ant, IMPORTED FROM MJCF.
+"""ANT — the canonical "run forward as fast as possible" locomotion task, on the
+MuJoCo ant IMPORTED FROM MJCF. This is the conventional Ant benchmark (Gym/Brax/
+IsaacGymEnvs style): the policy outputs joint TORQUES, and the reward is forward
+velocity + an alive bonus + an uprightness term − an action cost. It trains in a
+few minutes and is the simplest "RL just works on the engine" demo.
 
-Demonstrates the rl.Mjcf import path end-to-end inside a real lm.rl task: ant.xml (MJCF)
--> mujoco-usd-converter -> UsdPhysics -> config-driven prep (assets/ant.rl.yaml: floating
-base + PD DriveAPI on the 8 leg joints) -> ingest -> RL. Same VecTask scaffolding as
-anymal_task, sized for the 8-DOF ant.
+Pipeline: ant.xml (MJCF) -> mujoco-usd-converter -> UsdPhysics -> config-driven prep
+(assets/ant.rl.yaml: floating base + an INERT PD drive so torque control is clean) ->
+ingest -> RL. Same rl.VecTask scaffolding as anymal_task, sized for the 8-DOF ant.
 
     LM_RL_VIEW=1 python ant_task.py                 # windowed: watch it train live
     python ant_task.py                              # headless train (rl_games)
     LM_RL_PLAY=runs/.../nn/Ant.pth python ant_task.py   # watch a trained policy
+
+obs(34) = base_z + lin_vel_b + ang_vel_b*0.25 + up_proj + heading_b_xy
+          + dof_pos_rel + dof_vel*0.05 + prev_actions
+action(8) -> joint torque = action * TORQUE_SCALE   (eJOINT_FORCE, PD drive inert)
+reward = 1.0*v_forward + 0.5*upright + 0.5*alive − 0.005*||action||^2
 """
 import math
 import os
@@ -20,29 +28,45 @@ _bootstrap.bootstrap()
 import lm.rl as rl
 
 _ANT = _bootstrap.ASSETS / "ant.xml"               # MuJoCo MJCF (imported via rl.Mjcf)
-_CFG = _bootstrap.ASSETS / "ant.rl.yaml"           # floating base + PD drives (prep config)
+_CFG = _bootstrap.ASSETS / "ant.rl.yaml"           # floating base + inert drive (prep config)
 
-NUM_ENVS    = int(os.environ.get("LM_RL_NUM_ENVS", "256"))
+NUM_ENVS    = int(os.environ.get("LM_RL_NUM_ENVS", "4096"))   # PPO wants a big batch
 ENV_SPACING = float(os.environ.get("LM_RL_SPACING", "2.5"))
 N_DOF       = 8
 GROUND_Z    = 0.0
-SPAWN_Z     = float(os.environ.get("LM_RL_ANT_SPAWN_Z", "0.55"))
+SPAWN_Z     = float(os.environ.get("LM_RL_ANT_SPAWN_Z", "0.62"))   # clear the feet off the ground
 SUBSTEPS    = 2
 
-LIN_VEL_SCALE, ANG_VEL_SCALE = 2.0, 0.25
+# Torque control: action in [-1,1] -> joint torque = action * TORQUE_SCALE (N*m). The
+# ant is light (torso density 5); MuJoCo's gear=150 is for a heavier scale, so a modest
+# torque is right here. Tunable via env so a validation run can dial it without an edit.
+TORQUE_SCALE = float(os.environ.get("LM_RL_ANT_TORQUE", "15.0"))
+ARMATURE     = float(os.environ.get("LM_RL_ANT_ARMATURE", "0.5"))   # joint inertia (stability)
+
+ANG_VEL_SCALE = 0.25
 DOF_VEL_SCALE = 0.05
-ACTION_SCALE  = 0.5
 CLIP_OBS      = 5.0
-TRACK_SIGMA   = 0.25
-REW_LIN_XY, REW_ANG_Z = 1.0, 0.5
-CMD_X, CMD_Y, CMD_YAW = (-1.5, 1.5), (-0.5, 0.5), (-1.0, 1.0)
-H_MIN_FRAC, UPRIGHT_MIN = 0.5, 0.5
 MAX_EPISODE_LENGTH = 1000
-NUM_OBS = 36
+NUM_OBS = 34
+
+# Reward weights (raw per-step, Brax/Gym ant convention — NOT dt-scaled; reward_shaper=1.0).
+W_FORWARD, W_UPRIGHT, W_ALIVE, W_ACTION = 1.0, 0.5, 0.5, 0.005
+# Termination is RELATIVE to the captured spawn height (the ant's natural upright rest is
+# ~1.2 m, so an absolute upper bound would spuriously kill it as it settles): fail only if
+# it dropped FALL_DROP below spawn (collapsed) or tipped past UPRIGHT_MIN (flipped).
+FALL_DROP   = float(os.environ.get("LM_RL_ANT_FALL_DROP", "0.5"))
+UPRIGHT_MIN = float(os.environ.get("LM_RL_ANT_UPRIGHT_MIN", "0.2"))
 
 ANT_PPO_PARAMS = {"params": {
-    "network": {"mlp": {"units": [128, 64, 32]}},
-    "config": {"reward_shaper": {"scale_value": 1.0}, "critic_coef": 2, "bounds_loss_coef": 0.001},
+    "network": {"mlp": {"units": [256, 128, 64]}},
+    "config": {
+        "reward_shaper": {"scale_value": 1.0},
+        "critic_coef": 2,
+        "bounds_loss_coef": 0.001,
+        # The alive+upright bonus (~1.0) makes "stand still" a strong local optimum; some
+        # entropy is needed for the policy to explore enough to discover a forward gait.
+        "entropy_coef": 0.01,
+    },
 }}
 
 
@@ -54,7 +78,7 @@ def _quat_rotate_inv(q, v):
 
 
 class AntTask(rl.VecTask):
-    """Track a commanded base velocity (vx, vy, yaw) on the MJCF-imported ant."""
+    """Run forward (+x) as fast as possible on the MJCF-imported ant, torque-controlled."""
 
     def __init__(self, num_envs=NUM_ENVS, headless=True):
         self.world = rl.World(num_envs=int(num_envs), env_spacing=ENV_SPACING)
@@ -63,14 +87,15 @@ class AntTask(rl.VecTask):
         sim, runner = self.world.build(
             headless=headless,
             config=rl.SimConfig(substeps=SUBSTEPS, device="auto",
-                                gpu_contact_buffer_multiplier=max(1.0, int(num_envs) / 512.0)),
-            title="Ant (MJCF, vel-cmd)")
+                                # the ant's 8 capsule legs sit near the ground -> many
+                                # broadphase pairs; size the GPU buffers generously.
+                                gpu_contact_buffer_multiplier=max(2.0, int(num_envs) / 256.0)),
+            title="Ant (MJCF, run-forward)")
         sim.play()
         super().__init__(sim, runner, num_obs=NUM_OBS, num_actions=N_DOF, name="Ant",
                          clip_obs=CLIP_OBS, max_episode_length=MAX_EPISODE_LENGTH,
                          seed=int(os.environ.get("LM_RL_SEED", "0")))
         self._nstep = 0
-        self._drive = None
 
     # -- task hooks ---------------------------------------------------------
 
@@ -78,76 +103,66 @@ class AntTask(rl.VecTask):
         torch = self._torch; dev = self.device
         self._dof = self.sim.acquire_dof_state_tensor()
         self._root = self.sim.acquire_root_state_tensor()
-        self._contact = self.sim.acquire_link_net_contact_force_tensor()
         self.sim.refresh_dof_state_tensor(); self.sim.refresh_root_state_tensor()
         self._default_dof = self.robot.default_dof_positions.unsqueeze(0).repeat(self.num_envs, 1)
         self._world_down = torch.tensor([0.0, 0.0, -1.0], device=dev).repeat(self.num_envs, 1)
-        self._cmd_scale = torch.tensor([LIN_VEL_SCALE, LIN_VEL_SCALE, ANG_VEL_SCALE], device=dev)
+        self._world_fwd = torch.tensor([1.0, 0.0, 0.0], device=dev).repeat(self.num_envs, 1)
         self._prev_action = torch.zeros(self.num_envs, N_DOF, device=dev)
-        self._commands = torch.zeros(self.num_envs, 3, device=dev)
-        self._h_min = self._root[:, 2] * H_MIN_FRAC
         home = torch.zeros(self.num_envs, 13, device=dev)
         home[:, 0:3] = self._root[:, 0:3]
         home[:, 6] = 1.0
         self._home = home
-
-    def _sample_commands(self, ids):
-        torch = self._torch; dev = self.device; n = ids.numel()
-        if self._drive is not None:
-            self._commands[ids, 0], self._commands[ids, 1], self._commands[ids, 2] = self._drive
-            return
-        fixed = os.environ.get("LM_RL_CMD")
-        if fixed:
-            c = [float(x) for x in fixed.split(",")]
-            self._commands[ids, 0], self._commands[ids, 1], self._commands[ids, 2] = c[0], c[1], c[2]
-            return
-        self._commands[ids, 0] = torch.empty(n, device=dev).uniform_(*CMD_X)
-        self._commands[ids, 1] = torch.empty(n, device=dev).uniform_(*CMD_Y)
-        self._commands[ids, 2] = torch.empty(n, device=dev).uniform_(*CMD_YAW)
+        self._home_z = self._root[:, 2].clone()      # per-env spawn height (fall baseline)
+        # Per-DOF joint armature for numerical stability under direct torque control
+        # (mimics MuJoCo's armature=1). One-time CPU write across roots.
+        self.sim.set_dof_armature(torch.full((self.num_envs, N_DOF), ARMATURE, device=dev))
 
     def _pre_physics_step(self, actions):
-        if self._drive is not None:
-            self._commands[:, 0], self._commands[:, 1], self._commands[:, 2] = self._drive
+        # `actions` is already clipped to [-1, 1] by the base; map to joint torque.
         self._prev_action = actions
-        self.sim.set_dof_position_target_tensor(self._default_dof + ACTION_SCALE * actions)
+        self.sim.set_dof_actuation_force_tensor(actions * TORQUE_SCALE)
 
     def _compute_observations(self):
         self.sim.refresh_root_state_tensor()
         root, dof = self._root, self._dof
         quat = root[:, 3:7]
-        self._lin_body = _quat_rotate_inv(quat, root[:, 7:10])
-        self._ang_body = _quat_rotate_inv(quat, root[:, 10:13])
+        self._lin_world = root[:, 7:10]                      # world-frame linear velocity
+        lin_b = _quat_rotate_inv(quat, root[:, 7:10])
+        ang_b = _quat_rotate_inv(quat, root[:, 10:13])
         proj_grav = _quat_rotate_inv(quat, self._world_down)
-        self._up_proj = -proj_grav[:, 2]
+        self._up_proj = -proj_grav[:, 2]                     # 1 = upright, <0 = flipped
+        heading_b = _quat_rotate_inv(quat, self._world_fwd)  # world +x in body frame
         o = self.obs_buf
-        o[:, 0:3] = self._lin_body * LIN_VEL_SCALE
-        o[:, 3:6] = self._ang_body * ANG_VEL_SCALE
-        o[:, 6:9] = proj_grav
-        o[:, 9:12] = self._commands * self._cmd_scale
-        o[:, 12:20] = dof[:, :N_DOF, 0] - self._default_dof
-        o[:, 20:28] = dof[:, :N_DOF, 1] * DOF_VEL_SCALE
-        o[:, 28:36] = self._prev_action
+        o[:, 0:1] = root[:, 2:3]                             # torso height
+        o[:, 1:4] = lin_b
+        o[:, 4:7] = ang_b * ANG_VEL_SCALE
+        o[:, 7:8] = self._up_proj.unsqueeze(1)
+        o[:, 8:10] = heading_b[:, :2]
+        o[:, 10:18] = dof[:, :N_DOF, 0] - self._default_dof
+        o[:, 18:26] = dof[:, :N_DOF, 1] * DOF_VEL_SCALE
+        o[:, 26:34] = self._prev_action
 
     def _compute_reward(self):
         torch = self._torch
-        lin_err = torch.sum((self._commands[:, :2] - self._lin_body[:, :2]) ** 2, dim=1)
-        ang_err = (self._commands[:, 2] - self._ang_body[:, 2]) ** 2
-        self.rew_buf = torch.clamp(
-            torch.exp(-lin_err / TRACK_SIGMA) * REW_LIN_XY
-            + torch.exp(-ang_err / TRACK_SIGMA) * REW_ANG_Z, min=0.0)
+        forward = self._lin_world[:, 0]                      # +x world velocity
+        action_cost = (self._prev_action ** 2).sum(dim=1)
+        self.rew_buf = (W_FORWARD * forward
+                        + W_UPRIGHT * self._up_proj
+                        + W_ALIVE
+                        - W_ACTION * action_cost)
 
         height = self._root[:, 2]
-        self.sim.refresh_link_net_contact_force_tensor()
-        base_contact = self._contact[:, 0, :].norm(dim=1)
-        fail = (height < self._h_min) | (self._up_proj < UPRIGHT_MIN)
+        # RELATIVE fall (dropped below spawn) or flipped — no absolute upper bound (the ant
+        # naturally rests ~1.2 m and would trip an absolute cap as it settles).
+        fail = (height < self._home_z - FALL_DROP) | (self._up_proj < UPRIGHT_MIN)
         self.reset_buf = fail.float()
 
         self._nstep += 1
         if self._nstep % 500 == 0:
             print(f"[ant-dbg] step {self._nstep} | ep_len(mean)={float(self.progress_buf.mean()):.1f} "
-                  f"| track_rew={float(self.rew_buf.mean()):.3f} | vx={float(self._lin_body[:,0].mean()):+.2f} "
-                  f"(cmd_x~{float(self._commands[:,0].mean()):+.2f}) | upright={float(self._up_proj.mean()):.2f} "
-                  f"| height={float(height.mean()):.2f} | fails={int(fail.sum())}", flush=True)
+                  f"| rew={float(self.rew_buf.mean()):.3f} | vx={float(forward.mean()):+.2f} m/s "
+                  f"| upright={float(self._up_proj.mean()):.2f} | height={float(height.mean()):.2f} "
+                  f"| fails={int(fail.sum())}", flush=True)
 
     def _reset_idx(self, ids):
         torch = self._torch; n = ids.numel(); dev = self.device
@@ -156,9 +171,7 @@ class AntTask(rl.VecTask):
         self._dof[ids, :N_DOF, 1] = (torch.rand(n, N_DOF, device=dev) - 0.5) * 0.2
         self.sim.set_root_state_tensor_indexed(self._root, ids)
         self.sim.set_dof_state_tensor_indexed(self._dof, ids)
-        self.sim.set_dof_position_target_tensor_indexed(self._default_dof, ids)
         self._prev_action[ids] = 0.0
-        self._sample_commands(ids)
         self.progress_buf[ids] = 0.0
 
 
@@ -177,7 +190,6 @@ if __name__ == "__main__":
     try:
         if not headless:
             _frame_camera(task)
-            task._drive = [1.0, 0.0, 0.0]   # walk forward in the windowed view
         if play_ckpt:
             import copy
             pp = copy.deepcopy(ANT_PPO_PARAMS)
@@ -186,7 +198,7 @@ if __name__ == "__main__":
                 "deterministic": True, "render": False}
             rl.play_rl_games(task, play_ckpt, params=pp)
         else:
-            rl.train_rl_games(task, max_epochs=int(os.environ.get("LM_RL_EPOCHS", "1000")), seed=0,
+            rl.train_rl_games(task, max_epochs=int(os.environ.get("LM_RL_EPOCHS", "500")), seed=0,
                               horizon_length=24, mini_epochs=5, params=ANT_PPO_PARAMS)
     except BaseException:
         import traceback; print("[ant-dbg] run raised:"); traceback.print_exc()

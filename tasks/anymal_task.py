@@ -33,7 +33,7 @@ faulthandler.enable()
 _ROBOT = _bootstrap.ASSETS / "anymal_converted" / "anymal.usda"
 _CFG   = _bootstrap.ASSETS / "anymal_c.rl.yaml"   # floating base + PD drives (config-driven prep)
 
-NUM_ENVS    = int(os.environ.get("LM_RL_NUM_ENVS", "256"))
+NUM_ENVS    = int(os.environ.get("LM_RL_NUM_ENVS", "4096"))   # PPO wants a big batch (Isaac uses 4096)
 ENV_SPACING = float(os.environ.get("LM_RL_SPACING", "4.0"))
 N_DOF       = 12
 GROUND_Z    = -0.65
@@ -45,8 +45,16 @@ ACTION_SCALE  = 0.5
 CLIP_OBS      = 5.0
 TRACK_SIGMA   = 0.25
 REW_LIN_XY, REW_ANG_Z = 1.0, 0.5
-CMD_X, CMD_Y, CMD_YAW = (-2.0, 2.0), (-1.0, 1.0), (-1.0, 1.0)
-H_MIN_FRAC, UPRIGHT_MIN = 0.55, 0.6
+# Forward-first command distribution: the bare velocity-tracking reward leaves the policy
+# stuck at vx=0 (crouch + step in place) because backward/lateral/large-yaw commands make the
+# task too hard to bootstrap. Bias the commands forward (no backward, modest lateral/yaw) so
+# forward walking is the dominant skill to learn; widen later once it walks. (Genesis's simple
+# demo trains forward-only; IsaacLab gets the full range only with 4096 envs + 300 iters.)
+CMD_X, CMD_Y, CMD_YAW = (0.0, 1.5), (-0.5, 0.5), (-0.5, 0.5)
+# Height-fall threshold as an ABSOLUTE drop below the spawn height (a fraction of the
+# spawn z is too tight here: the anymal base sits at ~0.12 m, so 0.55x = a 4 cm margin
+# that a normal gait bob trips). Fall = base dropped > H_MIN_DROP below where it spawned.
+H_MIN_DROP, UPRIGHT_MIN = 0.30, 0.6
 MAX_EPISODE_LENGTH = 1000
 # Net contact force on the base link (articulation link 0) above this => the trunk is on
 # the ground = a fall (complements the height/upright test with a real contact signal).
@@ -63,8 +71,37 @@ ANYMAL_PPO_PARAMS = {"params": {
         "reward_shaper": {"scale_value": 1.0},
         "critic_coef": 2,
         "bounds_loss_coef": 0.001,
+        # A little entropy to escape the "step in place at vx=0" local optimum: the tracking
+        # reward gradient is weak far from the target, so the policy needs to explore enough
+        # to discover that striding forward pays off.
+        "entropy_coef": 0.01,
     },
 }}
+
+# IsaacLab velocity-FLAT reward set (the one that produces a clean walking gait, not just
+# velocity-tracking-by-sliding). Weights are the IsaacLab values applied as-is: lm.rl's
+# RewardManager multiplies each by dt exactly like IsaacLab's reward_manager (func*weight*dt),
+# so the weights port directly. The gait-shaping terms (feet_air_time lifts the feet,
+# flat_orientation + lin_vel_z keep the trunk level, action_rate + dof_acc smooth the motion)
+# are what was missing from the bare 3-term IsaacGymEnvs reward. All terms already live in
+# lm/rl/_rewards.py and read state set up in _update_state.
+REWARD_TERMS = [
+    rl.RewardTerm("track_lin_vel_xy",   rl.rewards.track_lin_vel_xy_exp,   1.0,     {"std": 0.5}),
+    rl.RewardTerm("track_ang_vel_z",    rl.rewards.track_ang_vel_z_exp,    0.5,     {"std": 0.5}),
+    rl.RewardTerm("lin_vel_z",          rl.rewards.lin_vel_z_l2,          -2.0),
+    rl.RewardTerm("ang_vel_xy",         rl.rewards.ang_vel_xy_l2,         -0.05),
+    rl.RewardTerm("dof_torques",        rl.rewards.dof_torques_l2,        -2.5e-5),
+    rl.RewardTerm("dof_acc",            rl.rewards.dof_acc_l2,            -2.5e-7),
+    rl.RewardTerm("action_rate",        rl.rewards.action_rate_l2,        -0.01),
+    rl.RewardTerm("feet_air_time",      rl.rewards.feet_air_time,          0.5,     {"threshold": 0.5}),
+    rl.RewardTerm("undesired_contacts", rl.rewards.undesired_contacts,    -1.0,     {"threshold": 1.0}),
+    rl.RewardTerm("flat_orientation",   rl.rewards.flat_orientation_l2,   -5.0),
+    # Anti-crouch: pull the base back to its captured standing height (target set per-env in
+    # _capture). Not an IsaacLab term, but it cleans up the low/crouched gait a small budget
+    # converges to. -10 was too weak (the gait stayed crouched at -0.34 vs -0.17 stand); -50
+    # is Genesis's value, strong enough to actually keep the trunk up.
+    rl.RewardTerm("base_height",        rl.rewards.base_height_l2,       -50.0),
+]
 
 
 def _quat_rotate_inv(q, v):
@@ -149,7 +186,9 @@ class AnymalTask(rl.VecTask):
             _gpu_mult = max(_gpu_mult, int(num_envs) / 256.0, 2.0)
         sim, runner = self.world.build(
             headless=headless, instanceable=instanceable,
-            config=rl.SimConfig(substeps=SUBSTEPS, device="auto",
+            # 50 Hz control (dt=0.02) to match IsaacLab: the dt-scaled penalty weights
+            # (dof_acc ∝ 1/dt², etc.) are tuned for 50 Hz, so 60 Hz over-weighted them.
+            config=rl.SimConfig(dt=1.0 / 50.0, substeps=SUBSTEPS, device="auto",
                                 gpu_contact_buffer_multiplier=_gpu_mult),
             title="ANYmal (rl_games, vel-cmd)")
         sim.play()
@@ -178,16 +217,57 @@ class AnymalTask(rl.VecTask):
         self._world_down = torch.tensor([0.0, 0.0, -1.0], device=dev).repeat(self.num_envs, 1)
         self._cmd_scale = torch.tensor([LIN_VEL_SCALE, LIN_VEL_SCALE, ANG_VEL_SCALE], device=dev)
         self._prev_action = torch.zeros(self.num_envs, N_DOF, device=dev)
+        self._last_action = torch.zeros(self.num_envs, N_DOF, device=dev)
         self._commands = torch.zeros(self.num_envs, 3, device=dev)
-        # Per-env spawn pose: capture the ingest-time root x/y/z per env. With terrain
+        # Settle onto the feet before capturing the home/reset pose. The direct-GPU batch
+        # reports "ready" a few steps after build — well before the robot has settled from
+        # its spawn height onto its feet — so capturing home now would make every episode
+        # reset to a too-high pose that drops into a crouch. Hold the default PD stance for a
+        # moment so `home` is a clean stand at the natural height.
+        for _ in range(80):
+            self.sim.set_dof_position_target_tensor(self._default_dof)
+            self.sim.simulate(); self.sim.fetch_results()
+            if self.runner is not None:
+                self.runner.run()
+        self.sim.refresh_dof_state_tensor(); self.sim.refresh_root_state_tensor()
+        # Per-env spawn pose: capture the SETTLED root x/y/z per env. With terrain
         # variants each env's robot is lifted to its own terrain height, so reset AND the
         # fall threshold are per-env — a uniform mean would re-explode robots on raised
         # terrain when they reset.
-        self._h_min = self._root[:, 2] * H_MIN_FRAC
+        self._h_min = self._root[:, 2] - H_MIN_DROP
         home = torch.zeros(self.num_envs, 13, device=dev)
         home[:, 0:3] = self._root[:, 0:3]
         home[:, 6] = 1.0
         self._home = home
+        # Target for the base_height reward: the settled standing height (per-env).
+        self.base_height_target = self._root[:, 2].clone()
+
+        # --- reward-manager state (B1) ---------------------------------------
+        # control step (for dof_acc + IsaacLab dt-scaled reward weights).
+        self.dt = float(self.sim._cfg.dt) * int(self.control_freq_inv)
+        # applied joint torques (for the torque penalty) + acceleration tracking.
+        self._dof_force = self.sim.acquire_applied_dof_force_tensor()
+        self._prev_dof_vel = torch.zeros(self.num_envs, N_DOF, device=dev)
+        # Feet + undesired-contact link rows, picked by name pattern from the engine link
+        # map (anymal: *_FOOT, *_THIGH/*_SHANK). Drive the feet_air_time / undesired_contacts
+        # terms off the per-link contact-force tensor.
+        lm = self.robot.view.link_map
+        # Feet = the FOOT links (where ground contact now correctly lands after the engine fix
+        # that stops giving collider-less-but-inertia-authored links a spurious fallback sphere;
+        # before it, the anymal rested on fallback spheres on the SHANK links and the FOOT links
+        # read 0 N). Verified: standing stance -> each FOOT ~63 N (~weight/4), SHANK ~0.
+        self.feet_indices = torch.tensor(
+            [i for n, i in lm.items() if n.upper().endswith("FOOT")], device=dev, dtype=torch.long)
+        # Undesired contact = THIGH only (IsaacLab): a distinct link that should never touch.
+        self.undesired_contact_indices = torch.tensor(
+            [i for n, i in lm.items() if n.upper().endswith("THIGH")], device=dev, dtype=torch.long)
+        # Termination bodies: base + THIGH (knee) only (IsaacGymEnvs' anymal terminates on these).
+        self.knee_indices = torch.tensor(
+            [i for n, i in lm.items() if n.upper().endswith("THIGH")], device=dev, dtype=torch.long)
+        nf = int(self.feet_indices.numel())
+        self._air_time = torch.zeros(self.num_envs, nf, device=dev)
+        self._prev_in_contact = torch.zeros(self.num_envs, nf, dtype=torch.bool, device=dev)
+        self.rewards = rl.RewardManager(self, REWARD_TERMS)
 
     def _sample_commands(self, ids):
         torch = self._torch; dev = self.device; n = ids.numel()
@@ -214,41 +294,68 @@ class AnymalTask(rl.VecTask):
             self._commands[:, 0] = self._drive[0]
             self._commands[:, 1] = self._drive[1]
             self._commands[:, 2] = self._drive[2]
-        self._prev_action = actions
+        self._prev_action = self._last_action    # action_rate penalty reads both
+        self._last_action = actions
         targets = self._default_dof + ACTION_SCALE * actions
         self.sim.set_dof_position_target_tensor(targets)
 
-    def _compute_observations(self):
+    def _update_state(self):
+        """Refresh the standardized per-step robot state the reward terms read off `self`."""
+        torch = self._torch
         self.sim.refresh_root_state_tensor()
+        self.sim.refresh_applied_dof_force_tensor()
+        self.sim.refresh_link_net_contact_force_tensor()
         root, dof = self._root, self._dof
         quat = root[:, 3:7]
-        self._lin_body = _quat_rotate_inv(quat, root[:, 7:10])
-        self._ang_body = _quat_rotate_inv(quat, root[:, 10:13])
-        proj_grav = _quat_rotate_inv(quat, self._world_down)
-        self._up_proj = -proj_grav[:, 2]
+        self.base_height = root[:, 2]                    # for the base_height reward
+        self.lin_vel_b = _quat_rotate_inv(quat, root[:, 7:10])
+        self.ang_vel_b = _quat_rotate_inv(quat, root[:, 10:13])
+        self.proj_gravity = _quat_rotate_inv(quat, self._world_down)
+        self._up_proj = -self.proj_gravity[:, 2]
+        self.dof_vel = dof[:, :N_DOF, 1]
+        self.dof_acc = (self.dof_vel - self._prev_dof_vel) / self.dt
+        self._prev_dof_vel = self.dof_vel.clone()
+        self.dof_torque = self._dof_force[:, :N_DOF]
+        self.contact_forces = self._contact
+        self.actions, self.prev_actions = self._last_action, self._prev_action
+        self.commands = self._commands
+        # feet air time: accumulate while airborne; the reward reads it at the first contact.
+        ff = self.contact_forces[:, self.feet_indices, :].norm(dim=2)     # (envs, n_feet)
+        in_contact = ff > 1.0
+        self.feet_first_contact = in_contact & (~self._prev_in_contact)
+        self.feet_air_time = self._air_time.clone()
+        self._air_time = torch.where(in_contact, torch.zeros_like(self._air_time),
+                                     self._air_time + self.dt)
+        self._prev_in_contact = in_contact
+
+    def _compute_observations(self):
+        self._update_state()
         o = self.obs_buf
-        o[:, 0:3] = self._lin_body * LIN_VEL_SCALE
-        o[:, 3:6] = self._ang_body * ANG_VEL_SCALE
-        o[:, 6:9] = proj_grav
-        o[:, 9:12] = self._commands * self._cmd_scale
-        o[:, 12:24] = dof[:, :N_DOF, 0] - self._default_dof
-        o[:, 24:36] = dof[:, :N_DOF, 1] * DOF_VEL_SCALE
-        o[:, 36:48] = self._prev_action
+        o[:, 0:3] = self.lin_vel_b * LIN_VEL_SCALE
+        o[:, 3:6] = self.ang_vel_b * ANG_VEL_SCALE
+        o[:, 6:9] = self.proj_gravity
+        o[:, 9:12] = self.commands * self._cmd_scale
+        o[:, 12:24] = self._dof[:, :N_DOF, 0] - self._default_dof
+        o[:, 24:36] = self.dof_vel * DOF_VEL_SCALE
+        o[:, 36:48] = self._last_action
 
     def _compute_reward(self):
         torch = self._torch
-        lin_err = torch.sum((self._commands[:, :2] - self._lin_body[:, :2]) ** 2, dim=1)
-        ang_err = (self._commands[:, 2] - self._ang_body[:, 2]) ** 2
-        self.rew_buf = torch.clamp(
-            torch.exp(-lin_err / TRACK_SIGMA) * REW_LIN_XY
-            + torch.exp(-ang_err / TRACK_SIGMA) * REW_ANG_Z, min=0.0)
+        # IsaacLab convention: sum the weighted terms WITHOUT clamping at 0 — the penalty
+        # terms (flat_orientation, lin_vel_z, ...) must keep their negative gradient so the
+        # policy is pushed to fix a bad posture, not just collapse to a clamped-zero reward.
+        self.rew_buf = self.rewards.compute()
 
         height = self._root[:, 2]
-        # Real foot/trunk contact: base link (articulation link 0) on the ground = a fall.
-        self.sim.refresh_link_net_contact_force_tensor()
+        # Fall = base OR thigh (knee) on the ground (IsaacGymEnvs' anymal termination). NO
+        # height/upright test (too tight here) and NO shank (it touches in a normal gait).
         base_contact = self._contact[:, 0, :].norm(dim=1)
-        fail = (height < self._h_min) | (self._up_proj < UPRIGHT_MIN) | (base_contact > BASE_CONTACT_FAIL_N)
+        knee_contact = self._contact[:, self.knee_indices, :].norm(dim=2)              # (envs, 4)
+        f_c = (base_contact > BASE_CONTACT_FAIL_N) | (knee_contact > BASE_CONTACT_FAIL_N).any(dim=1)
+        fail = f_c
         self.reset_buf = fail.float()
+        if self._nstep % 500 == 0:
+            print(f"[anymal-dbg]   FAIL: contact(base+knee)={int(f_c.sum())}", flush=True)
 
         self._nstep += 1
         # Instanced fleet (LM_RL_INSTANCE=1): once instancing has resolved (a few rendered
@@ -267,10 +374,12 @@ class AnymalTask(rl.VecTask):
             curr_s = f" | curr_level(mean)={self.curr.mean_level():.2f}/{self.curr.max_level-1}" \
                      if self.curr is not None else ""
             print(f"[anymal-dbg] step {self._nstep} | ep_len(mean)={float(self.progress_buf.mean()):.1f} "
-                  f"| track_rew={float(self.rew_buf.mean()):.3f} | vx={float(self._lin_body[:,0].mean()):+.2f} "
+                  f"| rew={float(self.rew_buf.mean()):.3f} | vx={float(self.lin_vel_b[:,0].mean()):+.2f} "
                   f"(cmd_x~{float(cmd[0]):+.2f}) | upright={float(self._up_proj.mean()):.2f} "
-                  f"| height={float(height.mean()):.2f} | base_contact>{BASE_CONTACT_FAIL_N:g}N="
-                  f"{int((base_contact > BASE_CONTACT_FAIL_N).sum())} | fails={int(fail.sum())}{curr_s}", flush=True)
+                  f"| height={float(height.mean()):.2f} | air={float(self._air_time.mean()):.2f}"
+                  f" | fails={int(fail.sum())}{curr_s}", flush=True)
+            ep = self.rewards.episode_means()
+            print("[anymal-dbg]   rew terms: " + " ".join(f"{k}={v:+.3f}" for k, v in ep.items()), flush=True)
 
     def _reset_idx(self, ids):
         torch = self._torch; n = ids.numel(); dev = self.device
@@ -283,7 +392,7 @@ class AnymalTask(rl.VecTask):
             move_down = (dist < 0.5) & (~move_up)
             self.curr.update(ids, move_up, move_down)
             self._home[ids, 0:3] = self.curr.env_origins[ids]
-            self._h_min[ids] = self.curr.env_origins[ids, 2] * H_MIN_FRAC
+            self._h_min[ids] = self.curr.env_origins[ids, 2] - H_MIN_DROP
         self._root[ids] = self._home[ids]
         self._dof[ids, :N_DOF, 0] = self._default_dof[ids] * (0.5 + torch.rand(n, N_DOF, device=dev))
         self._dof[ids, :N_DOF, 1] = (torch.rand(n, N_DOF, device=dev) - 0.5) * 0.2
@@ -291,6 +400,13 @@ class AnymalTask(rl.VecTask):
         self.sim.set_dof_state_tensor_indexed(self._dof, ids)
         self.sim.set_dof_position_target_tensor_indexed(self._default_dof, ids)
         self._prev_action[ids] = 0.0
+        self._last_action[ids] = 0.0
+        # Reward-state trackers must restart with the episode (else stale air time / dof_acc
+        # leak across the reset), and the per-term episode sums are logged-then-zeroed.
+        self._prev_dof_vel[ids] = 0.0
+        self._air_time[ids] = 0.0
+        self._prev_in_contact[ids] = False
+        self.rewards.reset(ids)
         self._sample_commands(ids)
         self.progress_buf[ids] = 0.0
 
