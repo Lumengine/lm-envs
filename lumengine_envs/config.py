@@ -58,7 +58,12 @@ class LeggedConfig(BaseConfig):
     ground_z: float = -0.65           # ground plane height (so the feet rest on it)
     spawn_z: float = 0.0
     action_scale: float = 0.5         # target = action_scale * action + default stance
+    # Reward recipe: "isaaclab" = the 11-term flat-velocity set (good for a high-authority
+    # robot like anymal); "genesis" = the minimal 6-term set (tracking + light penalties +
+    # similar_to_default) that lets a low-authority robot like Go2 actually walk.
+    reward: str = "isaaclab"
     feet_air_time_threshold: float = 0.5   # swing-time (s) the foot-air-time reward credits past
+    reset_mode: str = "scaled"        # "scaled" = default*U(0.5,1.5) (IsaacGymEnvs); "offset" = default+small noise
     foot_suffix: str = "FOOT"         # link-name suffix for feet (contact / air-time)
     thigh_suffix: str = "THIGH"       # link-name suffix for the undesired/knee-contact links
     base_contact_fail_n: float = 1.0  # base/knee contact force (N) above which = a fall
@@ -92,8 +97,10 @@ class Go2Config(LeggedConfig):
     rl_yaml: str = "go2.rl.yaml"
     env_spacing: float = 2.5
     ground_z: float = -0.40           # go2 is smaller than anymal (lower stance)
-    action_scale: float = 0.25        # Genesis go2 value
+    action_scale: float = 0.5         # enough leg swing to step in our sim (paired with Kp40/Kd1.0)
+    reward: str = "genesis"           # minimal recipe — Go2 walks; the anymal set smothers it
     feet_air_time_threshold: float = 0.2   # go2 trots fast — short swing; don't punish it
+    reset_mode: str = "offset"        # spawn near the stance so the stiffer snap doesn't tip it
 
 
 # ── layering helpers ─────────────────────────────────────────────────────────

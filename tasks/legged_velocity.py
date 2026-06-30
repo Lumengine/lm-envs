@@ -43,10 +43,26 @@ LEGGED_PPO_PARAMS = {"params": {
     },
 }}
 
-# IsaacLab velocity-FLAT reward set (clean gait, not tracking-by-sliding) + anti-crouch.
-# Built per-task so the feet_air_time threshold can follow the robot's gait speed
-# (the swing time differs between a big slow anymal and a fast-trotting Go2).
+# Two reward recipes, picked by cfg.reward (see LeggedConfig.reward):
+#  - "isaaclab": the 11-term velocity-FLAT set — clean gait for a high-authority robot (anymal).
+#  - "genesis":  the minimal Unitree-go2 set (tracking + a few light penalties +
+#                similar_to_default). A low-authority robot like Go2 needs this: the heavy
+#                IsaacLab penalties (torques/dof_acc/orientation/undesired_contacts/feet_air_time)
+#                smother its motion into a crouch, while the minimal set lets it walk.
+# Built per-task so the feet_air_time threshold follows the robot's gait speed.
 def _reward_terms(cfg):
+    if getattr(cfg, "reward", "isaaclab") == "genesis":
+        return [
+            # std=0.5 so the exp kernel is exp(-err²/0.25) — matches Genesis tracking_sigma=0.25
+            # (our kernel squares std). std=0.25 would be 4× too sharp → ~no signal until already
+            # fast → the policy never leaves the stand-still optimum.
+            rl.RewardTerm("track_lin_vel_xy",   rl.rewards.track_lin_vel_xy_exp,   1.0,   {"std": 0.5}),
+            rl.RewardTerm("track_ang_vel_z",    rl.rewards.track_ang_vel_z_exp,    0.2,   {"std": 0.5}),
+            rl.RewardTerm("lin_vel_z",          rl.rewards.lin_vel_z_l2,          -1.0),
+            rl.RewardTerm("action_rate",        rl.rewards.action_rate_l2,        -0.005),
+            rl.RewardTerm("similar_to_default", rl.rewards.joint_deviation_l1,    -0.1),
+            rl.RewardTerm("base_height",        rl.rewards.base_height_l2,       -50.0),
+        ]
     return [
         rl.RewardTerm("track_lin_vel_xy",   rl.rewards.track_lin_vel_xy_exp,   1.0,     {"std": 0.5}),
         rl.RewardTerm("track_ang_vel_z",    rl.rewards.track_ang_vel_z_exp,    0.5,     {"std": 0.5}),
@@ -73,11 +89,16 @@ OBS_TERMS = [
     rl.ObsTerm("actions",  rl.observations.last_action),
 ]
 
-EVENT_TERMS = [
-    rl.EventTerm("reset_root",   rl.events.reset_root_to_home, mode="reset"),
-    rl.EventTerm("reset_joints", rl.events.reset_joints_scaled, mode="reset",
-                 params={"lo": 0.5, "hi": 1.5, "vel_noise": 0.1}),
-]
+def _event_terms(cfg):
+    """Reset events. 'scaled' = default*U(0.5,1.5) (IsaacGymEnvs anymal); 'offset' = default +
+    small noise (a gentle spawn near the stance, so a stiff PD snap doesn't tip a light robot)."""
+    if cfg.reset_mode == "offset":
+        reset_joints = rl.EventTerm("reset_joints", rl.events.reset_joints_offset, mode="reset",
+                                    params={"pos_noise": 0.1, "vel_noise": 0.1})
+    else:
+        reset_joints = rl.EventTerm("reset_joints", rl.events.reset_joints_scaled, mode="reset",
+                                    params={"lo": 0.5, "hi": 1.5, "vel_noise": 0.1})
+    return [rl.EventTerm("reset_root", rl.events.reset_root_to_home, mode="reset"), reset_joints]
 
 
 def _quat_rotate_inv(q, v):
@@ -223,7 +244,7 @@ class LeggedVelocityTask(rl.VecTask):
         ])
         self.commands_mgr = rl.CommandManager(self, {"base_velocity": rl.UniformVelocityCommand(
             self, vx=CMD_X, vy=CMD_Y, yaw=CMD_YAW, fixed=self._cmd)})
-        self.events = rl.EventManager(self, EVENT_TERMS)
+        self.events = rl.EventManager(self, _event_terms(self.cfg))
 
     def _pre_physics_step(self, actions):
         self._prev_action = self._last_action
