@@ -57,9 +57,17 @@ def _reward_terms(cfg):
             # (our kernel squares std). std=0.25 would be 4× too sharp → ~no signal until already
             # fast → the policy never leaves the stand-still optimum.
             rl.RewardTerm("track_lin_vel_xy",   rl.rewards.track_lin_vel_xy_exp,   1.0,   {"std": 0.5}),
-            rl.RewardTerm("track_ang_vel_z",    rl.rewards.track_ang_vel_z_exp,    0.2,   {"std": 0.5}),
+            # ang_vel_z tracking ×2.5 so a yaw=0 command holds a straight heading (the robot
+            # was curving while advancing).
+            rl.RewardTerm("track_ang_vel_z",    rl.rewards.track_ang_vel_z_exp,    0.5,   {"std": 0.5}),
             rl.RewardTerm("lin_vel_z",          rl.rewards.lin_vel_z_l2,          -1.0),
-            rl.RewardTerm("action_rate",        rl.rewards.action_rate_l2,        -0.005),
+            # Gait shaping (on the now-correct 50 Hz base): feet_clearance rewards swing feet for
+            # LIFTING (incremental, no threshold valley) → a real foot-lifting gait. Tuned DOWN
+            # (target 0.05, weight 1.0) — 0.10/2.0 gave an exaggerated prancing lift.
+            rl.RewardTerm("feet_clearance",     rl.rewards.feet_clearance,         1.0,   {"target": 0.05}),
+            rl.RewardTerm("feet_air_time",      rl.rewards.feet_air_time,          0.5,
+                          {"threshold": cfg.feet_air_time_threshold}),
+            rl.RewardTerm("action_rate",        rl.rewards.action_rate_l2,        -0.01),
             rl.RewardTerm("similar_to_default", rl.rewards.joint_deviation_l1,    -0.1),
             rl.RewardTerm("base_height",        rl.rewards.base_height_l2,       -50.0),
         ]
@@ -192,6 +200,7 @@ class LeggedVelocityTask(rl.VecTask):
         self._dof = self.sim.acquire_dof_state_tensor()
         self._root = self.sim.acquire_root_state_tensor()
         self._contact = self.sim.acquire_link_net_contact_force_tensor()
+        self._rigid_state = self.sim.acquire_rigid_body_state_tensor()  # per-link [pos,quat,lin,ang]
         self.sim.refresh_dof_state_tensor(); self.sim.refresh_root_state_tensor()
         self._default_dof = self.robot.default_dof_positions.unsqueeze(0).repeat(self.num_envs, 1)
         self._world_down = torch.tensor([0.0, 0.0, -1.0], device=dev).repeat(self.num_envs, 1)
@@ -228,6 +237,13 @@ class LeggedVelocityTask(rl.VecTask):
         nf = int(self.feet_indices.numel())
         self._air_time = torch.zeros(self.num_envs, nf, device=dev)
         self._prev_in_contact = torch.zeros(self.num_envs, nf, dtype=torch.bool, device=dev)
+        # Foot kinematics for feet_clearance/feet_slide: stance height = the settled foot-link z
+        # (baseline), so clearance = current foot z − stance z (height of the lifted foot).
+        self.sim.refresh_rigid_body_state_tensor()
+        self._foot_stance_z = self._rigid_state[:, self.feet_indices, 2].clone()
+        self.feet_pos = self._rigid_state[:, self.feet_indices, 0:3]
+        self.feet_vel = self._rigid_state[:, self.feet_indices, 7:10]
+        self.feet_clearance = self.feet_pos[:, :, 2] - self._foot_stance_z
 
         # Managers (declarative task definition):
         self.rewards = rl.RewardManager(self, _reward_terms(self.cfg))
@@ -256,6 +272,10 @@ class LeggedVelocityTask(rl.VecTask):
         self.sim.refresh_root_state_tensor()
         self.sim.refresh_applied_dof_force_tensor()
         self.sim.refresh_link_net_contact_force_tensor()
+        self.sim.refresh_rigid_body_state_tensor()
+        self.feet_pos = self._rigid_state[:, self.feet_indices, 0:3]
+        self.feet_vel = self._rigid_state[:, self.feet_indices, 7:10]
+        self.feet_clearance = self.feet_pos[:, :, 2] - self._foot_stance_z   # foot height above stance
         root, dof = self._root, self._dof
         quat = root[:, 3:7]
         self.base_height = root[:, 2]
