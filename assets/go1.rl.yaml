@@ -1,0 +1,30 @@
+# Unitree Go1 — MuJoCo Menagerie MJCF (assets/go1/, BSD-3, Unitree Robotics). Genesis-style
+# velocity locomotion prep: floats the base and authors a PD DriveAPI on the 12 leg joints.
+# Same joint naming + control recipe as Go2 (Unitree quadruped family).
+
+floating_base: true
+
+default_joint_angles:                # keyframe "home" stance (radians): hip 0 / thigh 0.9 / calf -1.8
+  FL_hip_joint: 0.0
+  FR_hip_joint: 0.0
+  RL_hip_joint: 0.0
+  RR_hip_joint: 0.0
+  FL_thigh_joint: 0.9
+  FR_thigh_joint: 0.9
+  RL_thigh_joint: 0.9
+  RR_thigh_joint: 0.9
+  FL_calf_joint: -1.8
+  FR_calf_joint: -1.8
+  RL_calf_joint: -1.8
+  RR_calf_joint: -1.8
+
+actuated_joints: ["*_hip_joint", "*_thigh_joint", "*_calf_joint"]   # the 12 leg joints
+
+drive:                               # Kp40/Kd1.0 — the gains that make Go2 walk in our sim
+                                     # (Genesis Kp20/Kd0.5 is too weak here) + motor torque limit
+  default: { stiffness: 40.0, damping: 1.0, max_force: 23.7, drive_type: force }
+
+# Render polish: light grey body + black lower legs (the foot is a geom on the calf link).
+display_color: [0.67, 0.69, 0.77]
+display_colors:
+  "*calf*": [0.02, 0.02, 0.02]

@@ -103,6 +103,30 @@ class Go2Config(LeggedConfig):
     reset_mode: str = "offset"        # spawn near the stance so the stiffer snap doesn't tip it
 
 
+@dataclass
+class Go1Config(LeggedConfig):
+    name: str = "Go1"
+    robot: str = "go1/go1.xml"        # MuJoCo Menagerie MJCF (BSD-3)
+    rl_yaml: str = "go1.rl.yaml"
+    env_spacing: float = 2.5
+    ground_z: float = -0.30           # ~0.27 m standing stance (keyframe home)
+    action_scale: float = 0.5
+    reward: str = "genesis"           # same recipe that makes Go2 walk
+    feet_air_time_threshold: float = 0.2
+    reset_mode: str = "offset"
+    # The MJCF has no foot body — the foot is a geom on the calf, so contact lands on the
+    # calf link. (Reward recipe "genesis" ignores feet anyway; this only labels contacts.)
+    foot_suffix: str = "calf"
+    thigh_suffix: str = "thigh"
+
+
+@dataclass
+class A1Config(Go1Config):
+    name: str = "A1"
+    robot: str = "a1/a1.xml"          # MuJoCo Menagerie MJCF (BSD-3)
+    rl_yaml: str = "a1.rl.yaml"
+
+
 # ── layering helpers ─────────────────────────────────────────────────────────
 
 def _coerce(value, to_type):

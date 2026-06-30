@@ -14,7 +14,7 @@ Migration note: tasks currently live as top-level modules under `tasks/` (e.g.
 import importlib
 from dataclasses import dataclass, field
 
-from .config import AntConfig, AnymalConfig, CartpoleConfig, Go2Config
+from .config import A1Config, AntConfig, AnymalConfig, CartpoleConfig, Go1Config, Go2Config
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,18 @@ REGISTRY: dict[str, TaskSpec] = {
     "Go2": TaskSpec(
         id="Go2", module="legged_velocity", cls="LeggedVelocityTask", config_cls=Go2Config,
         domain="locomotion", desc="Unitree Go2 (URDF) - velocity-command walking (shared legged task).",
+        default_envs=4096, max_epochs=1000,
+        train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
+
+    "Go1": TaskSpec(
+        id="Go1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=Go1Config,
+        domain="locomotion", desc="Unitree Go1 (MJCF, Menagerie) - velocity-command walking.",
+        default_envs=4096, max_epochs=1000,
+        train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
+
+    "A1": TaskSpec(
+        id="A1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=A1Config,
+        domain="locomotion", desc="Unitree A1 (MJCF, Menagerie) - velocity-command walking.",
         default_envs=4096, max_epochs=1000,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 }
