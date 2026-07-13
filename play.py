@@ -30,6 +30,10 @@ def main():
     ap.add_argument("--trainer", default="rl_games", choices=["rl_games", "rsl_rl", "skrl"])
     ap.add_argument("--cmd", default=None, help='fixed velocity command "vx,vy,yaw" for locomotion')
     ap.add_argument("--headless", action="store_true", help="no window (benchmark only)")
+    ap.add_argument("--no-realtime", action="store_true",
+                    help="don't pace the replay to real time (uncapped, as fast as the display renders)")
+    ap.add_argument("--speed", type=float, default=1.0,
+                    help="replay speed multiplier (1.0 = real time, 0.5 = slow-mo, 2.0 = 2x)")
     ap.add_argument("--config", help="path to a YAML config (default: configs/<Task>.yaml if present)")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                     help="override any config field (repeatable)")
@@ -63,7 +67,8 @@ def main():
             params = copy.deepcopy(ppo) if ppo else {}
             params.setdefault("params", {}).setdefault("config", {})["player"] = {
                 "games_num": 100000, "deterministic": True, "render": False}
-            rl.play_rl_games(task, args.checkpoint, params=params)
+            rl.play_rl_games(task, args.checkpoint, params=params,
+                             realtime=not (cfg.headless or args.no_realtime), speed=args.speed)
     except BaseException:
         import traceback
         print("[play] run raised:")
