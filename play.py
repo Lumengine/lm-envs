@@ -26,7 +26,10 @@ def main():
     ap = argparse.ArgumentParser(description="Play a trained LumengineEnvs policy.")
     ap.add_argument("--task", required=True, help="task id (see train.py --list)")
     ap.add_argument("--checkpoint", required=True, help="path to the trained checkpoint")
-    ap.add_argument("--num-envs", type=int, default=16, help="few envs for a clean view")
+    ap.add_argument("--num-envs", type=int, default=None,
+                    help="env count for the replay (default 16 for a clean view; a "
+                         "--set num_envs=... also works — the old default silently "
+                         "overrode it, flags win over --set in the config layering)")
     ap.add_argument("--trainer", default="rl_games", choices=["rl_games", "rsl_rl", "skrl"])
     ap.add_argument("--cmd", default=None, help='fixed velocity command "vx,vy,yaw" for locomotion')
     ap.add_argument("--headless", action="store_true", help="no window (benchmark only)")
@@ -46,6 +49,11 @@ def main():
     yaml_path = args.config or _default_yaml(spec.id)
     cfg = build_config(spec.config_cls, yaml_path=yaml_path, sets=args.set,
                        num_envs=args.num_envs, headless=args.headless, cmd=args.cmd)
+    # Viewing default: 16 envs, but ONLY when neither --num-envs nor --set num_envs=
+    # asked for something (a non-None flag default would silently override --set).
+    if args.num_envs is None and not any(
+            s.split("=", 1)[0].strip() == "num_envs" for s in args.set):
+        cfg.num_envs = 16
 
     module, cls, ppo = load_task(spec)
     import lm.rl as rl

@@ -20,13 +20,20 @@ default_joint_angles:                # IsaacLab Franka ready pose + fingers OPEN
 
 actuated_joints: ["*"]
 
+# max_joint_velocity = the REAL Franka joint speed limits (rad/s; fingers m/s).
+# Without them the PD whips joints at 5-10 rad/s and every motion looks violent.
 drive:
-  default: { stiffness: 80.0, damping: 4.0, max_force: 87.0, drive_type: force }
+  default: { stiffness: 80.0, damping: 4.0, max_force: 87.0, drive_type: force,
+             max_joint_velocity: 2.175 }
   groups:
-    - { match: "joint5", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force }
-    - { match: "joint6", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force }
-    - { match: "joint7", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force }
-    - { match: "finger_joint*", stiffness: 2000.0, damping: 100.0, max_force: 200.0, drive_type: force }
+    - { match: "joint5", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force,
+        max_joint_velocity: 2.61 }
+    - { match: "joint6", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force,
+        max_joint_velocity: 2.61 }
+    - { match: "joint7", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force,
+        max_joint_velocity: 2.61 }
+    - { match: "finger_joint*", stiffness: 2000.0, damping: 100.0, max_force: 200.0,
+        drive_type: force, max_joint_velocity: 0.2 }
 
 
 display_color: [0.92, 0.92, 0.94]
