@@ -1,0 +1,32 @@
+# Franka Emika Panda arm + gripper — MuJoCo Menagerie MJCF (assets/franka/panda.xml,
+# Apache-2.0). Lift variant: the two prismatic finger joints are MJCF tendon-coupled
+# (tendon "split" + equality), which the ingest does not support — so BOTH fingers get
+# their own PD drive and the task mirrors one gripper action onto the two targets.
+# Arm gains = the HIGH_PD set validated on Reach; finger gains follow IsaacLab's
+# Franka gripper actuator (Kp 2e3 / Kd 1e2, effort 200 N).
+
+floating_base: false
+
+default_joint_angles:                # IsaacLab Franka ready pose + fingers OPEN (0.04 m)
+  joint1: 0.0
+  joint2: -0.569
+  joint3: 0.0
+  joint4: -2.810
+  joint5: 0.0
+  joint6: 3.037
+  joint7: 0.741
+  finger_joint1: 0.04
+  finger_joint2: 0.04
+
+actuated_joints: ["*"]
+
+drive:
+  default: { stiffness: 80.0, damping: 4.0, max_force: 87.0, drive_type: force }
+  groups:
+    - { match: "joint5", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force }
+    - { match: "joint6", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force }
+    - { match: "joint7", stiffness: 80.0, damping: 4.0, max_force: 12.0, drive_type: force }
+    - { match: "finger_joint*", stiffness: 2000.0, damping: 100.0, max_force: 200.0, drive_type: force }
+
+
+display_color: [0.92, 0.92, 0.94]

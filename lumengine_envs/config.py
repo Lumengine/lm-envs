@@ -182,6 +182,31 @@ class FrankaReachConfig(BaseConfig):
     reset_joint_noise: float = 0.125  # reset pose = default + U(-noise, noise) rad
 
 
+@dataclass
+class FrankaLiftConfig(BaseConfig):
+    """Franka Panda lift — grasp a per-env cube and hold it at a goal height. The
+    gripper's tendon coupling is emulated by mirroring one action on both fingers."""
+    name: str = "FrankaLift"
+    robot: str = "franka/panda.xml"          # WITH the gripper
+    rl_yaml: str = "franka_lift.rl.yaml"
+    num_dof: int = 9                         # 7 arm + 2 fingers
+    num_envs: int = 4096
+    env_spacing: float = 2.0
+    action_scale: float = 0.5
+    ee_link: str = "hand"                    # grasp frame (fallback: link7)
+    cube_size: float = 0.04                  # cube edge (m)
+    cube_x: float = 0.50                     # spawn center, base-relative
+    cube_y: float = 0.0
+    cube_xy_noise: float = 0.05              # reset XY jitter (m; stays on the pedestal)
+    # IsaacLab-style pedestal: the cube sits on a small per-env table. Knocking it off
+    # TERMINATES the episode (object_dropping) — the structural anti-batting mechanism.
+    pedestal_size: float = 0.30              # square top (m)
+    pedestal_height: float = 0.05            # top surface z (m)
+    goal_z: float = 0.30                     # lift goal height above ground (m)
+    lift_min_height: float = 0.04            # "lifted" = cube this far above the pedestal top
+    reset_joint_noise: float = 0.10
+
+
 # ── layering helpers ─────────────────────────────────────────────────────────
 
 def _coerce(value, to_type):
