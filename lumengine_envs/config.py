@@ -160,6 +160,28 @@ class H1Config(LeggedConfig):
     contact_grace_steps: int = 3      # skip contact terminations right after a reset (teleport contact spike)
 
 
+@dataclass
+class FrankaReachConfig(BaseConfig):
+    """Franka Panda end-effector reach — the first manipulation task (Tier C). The arm
+    tracks a random 3D target with its end-effector under PD position control."""
+    name: str = "FrankaReach"
+    robot: str = "franka/panda_nohand.xml"   # 7-DOF, no gripper (Reach doesn't need one)
+    rl_yaml: str = "franka.rl.yaml"
+    num_dof: int = 7
+    num_envs: int = 4096
+    env_spacing: float = 2.0
+    action_scale: float = 0.5         # PD target = default stance + action_scale * action
+    ee_link: str = "attachment"       # end-effector link (fallback: link7 if merged away)
+    # Target sampling box, base-relative meters (IsaacLab reach command ranges).
+    target_x_min: float = 0.35
+    target_x_max: float = 0.65
+    target_y_min: float = -0.25
+    target_y_max: float = 0.25
+    target_z_min: float = 0.20
+    target_z_max: float = 0.60
+    reset_joint_noise: float = 0.125  # reset pose = default + U(-noise, noise) rad
+
+
 # ── layering helpers ─────────────────────────────────────────────────────────
 
 def _coerce(value, to_type):

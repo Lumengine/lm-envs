@@ -1,0 +1,30 @@
+# Franka Emika Panda arm — MuJoCo Menagerie MJCF (assets/franka/, Apache-2.0, Franka Robotics).
+# 7-DOF fixed-base manipulator (panda_nohand.xml — no gripper, so Reach avoids the MJCF
+# tendon-coupled fingers, which the ingest does not support). Stance follows IsaacLab's
+# FRANKA_PANDA_CFG; gains follow the HIGH_PD variant (stiffness 400 / damping 80): the soft
+# 80/4 gains sag ~0.17 rad under gravity on joint2/joint6 (steady error = torque/Kp), which
+# caps a position-controlled reach ~15 cm from the target. Effort limits stay at the real
+# robot's 87 N·m (shoulder) / 12 N·m (wrist).
+
+floating_base: false                 # bolted to the ground (fixed-base articulation)
+
+default_joint_angles:                # IsaacLab Franka init pose (radians): elbow-down ready pose
+  joint1: 0.0
+  joint2: -0.569
+  joint3: 0.0
+  joint4: -2.810
+  joint5: 0.0
+  joint6: 3.037
+  joint7: 0.741
+
+actuated_joints: ["*"]               # all 7 revolute joints
+
+drive:
+  default: { stiffness: 400.0, damping: 80.0, max_force: 87.0, drive_type: force }
+  groups:
+    # Wrist joints (5-7) have a 12 N·m effort limit on the real robot.
+    - { match: "joint5", stiffness: 400.0, damping: 80.0, max_force: 12.0, drive_type: force }
+    - { match: "joint6", stiffness: 400.0, damping: 80.0, max_force: 12.0, drive_type: force }
+    - { match: "joint7", stiffness: 400.0, damping: 80.0, max_force: 12.0, drive_type: force }
+
+display_color: [0.92, 0.92, 0.94]

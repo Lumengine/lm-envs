@@ -19,10 +19,11 @@ downloaded by `scripts/fetch_assets.py` (not committed) · `planned` = not yet a
 | Humanoid | Apache-2.0 | DeepMind dm_control | planned |
 | Walker | Apache-2.0 | DeepMind dm_control / Genesis | planned |
 | Unitree Go2 | BSD-3-Clause (© Unitree) | Unitree (unitree_ros) via Genesis; see assets/go2/LICENSE | vendored |
-| Unitree A1 / Go1 | BSD-3-Clause (© Unitree) | unitree_ros / MuJoCo Menagerie | planned |
+| Unitree A1 / Go1 | BSD-3-Clause (© Unitree) | MuJoCo Menagerie; see assets/a1/LICENSE, assets/go1/LICENSE | vendored |
 | Unitree B1 | BSD-3-Clause (© Unitree) | MuJoCo Menagerie | planned |
-| Unitree H1 / G1 | BSD-3-Clause (© Unitree) | unitree_ros / MuJoCo Menagerie | planned |
-| Franka Panda | Apache-2.0 | github.com/frankaemika/franka_ros | planned |
+| Unitree H1 | BSD-3-Clause (© Unitree) | MuJoCo Menagerie; see assets/h1/LICENSE | vendored |
+| Unitree G1 | BSD-3-Clause (© Unitree) | unitree_ros / MuJoCo Menagerie | planned |
+| Franka Panda | Apache-2.0 (© Franka Robotics) | MuJoCo Menagerie (franka_emika_panda); see assets/franka/LICENSE | vendored |
 | KUKA iiwa | Apache-2.0 / BSD-2 | ROS-Industrial / TU Munich | planned |
 | Universal Robots UR5e | BSD-3-Clause | ROS-Industrial (description only) | planned |
 | Kinova Gen3 / Jaco2 | BSD-3-Clause (© Kinova) | Kinova ROS | planned |
