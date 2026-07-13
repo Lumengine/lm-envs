@@ -14,7 +14,8 @@ Migration note: tasks currently live as top-level modules under `tasks/` (e.g.
 import importlib
 from dataclasses import dataclass, field
 
-from .config import A1Config, AntConfig, AnymalConfig, CartpoleConfig, Go1Config, Go2Config
+from .config import (A1Config, AntConfig, AnymalConfig, CartpoleConfig, Go1Config, Go2Config,
+                     H1Config)
 
 
 @dataclass(frozen=True)
@@ -66,6 +67,12 @@ REGISTRY: dict[str, TaskSpec] = {
         id="A1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=A1Config,
         domain="locomotion", desc="Unitree A1 (MJCF, Menagerie) - velocity-command walking.",
         default_envs=4096, max_epochs=1000,
+        train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
+
+    "H1": TaskSpec(
+        id="H1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=H1Config,
+        domain="locomotion", desc="Unitree H1 humanoid (MJCF, Menagerie) - bipedal velocity walking.",
+        default_envs=4096, max_epochs=1500,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 }
 

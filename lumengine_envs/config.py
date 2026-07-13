@@ -58,6 +58,15 @@ class LeggedConfig(BaseConfig):
     ground_z: float = -0.65           # ground plane height (so the feet rest on it)
     spawn_z: float = 0.0
     action_scale: float = 0.5         # target = action_scale * action + default stance
+    # Steps to hold the default PD stance before capturing the home/reset pose. A
+    # quadruped is statically stable, so a long settle plants it cleanly; a biped is an
+    # inverted pendulum that tips open-loop after ~0.7 s, so it must capture its upright
+    # (slightly squatted) equilibrium EARLY — before the tip poisons the home pose.
+    settle_steps: int = 80
+    # Post-reset grace: a freshly-teleported articulation can register a 1-frame contact
+    # spike (momentary ground penetration before it settles onto its feet). Skip contact
+    # terminations for this many steps after a reset. 0 = off (quadrupeds are unaffected).
+    contact_grace_steps: int = 0
     # Reward recipe: "isaaclab" = the 11-term flat-velocity set (good for a high-authority
     # robot like anymal); "genesis" = the minimal 6-term set (tracking + light penalties +
     # similar_to_default) that lets a low-authority robot like Go2 actually walk.
@@ -125,6 +134,30 @@ class A1Config(Go1Config):
     name: str = "A1"
     robot: str = "a1/a1.xml"          # MuJoCo Menagerie MJCF (BSD-3)
     rl_yaml: str = "a1.rl.yaml"
+
+
+@dataclass
+class H1Config(LeggedConfig):
+    """Unitree H1 humanoid (biped). Harder than the quads: balance on two feet, 19 DOF."""
+    name: str = "H1"
+    robot: str = "h1/h1.xml"          # MuJoCo Menagerie MJCF (BSD-3)
+    rl_yaml: str = "h1.rl.yaml"
+    num_dof: int = 19
+    env_spacing: float = 3.0
+    # The H1 MJCF authors the pelvis at z=1.06 (worldbody pos) and the converter preserves it,
+    # so the base spawns at ~1.06 (NOT at 0 like the URDF quadrupeds). Feet rest at ~0.04, so
+    # the ground plane sits at 0 — else (e.g. -1.05) the feet float ~1.1 m and the robot
+    # free-falls and collapses at spawn.
+    ground_z: float = 0.0
+    action_scale: float = 0.5
+    reward: str = "biped"             # IsaacLab H1 recipe (no lin_vel_z, feet_slide, mild orient.)
+    reset_mode: str = "offset"
+    foot_suffix: str = "ankle_link"   # H1's foot is the ankle link (contact lands there)
+    thigh_suffix: str = "knee_link"   # undesired/knee contact
+    feet_air_time_threshold: float = 0.4
+    upright_min: float = 0.6          # a biped tips easier — terminate sooner on tilt
+    settle_steps: int = 25            # biped: capture the upright standing equilibrium (base ~0.93) before it tips open-loop
+    contact_grace_steps: int = 3      # skip contact terminations right after a reset (teleport contact spike)
 
 
 # ── layering helpers ─────────────────────────────────────────────────────────

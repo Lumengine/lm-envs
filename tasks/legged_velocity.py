@@ -51,6 +51,22 @@ LEGGED_PPO_PARAMS = {"params": {
 #                smother its motion into a crouch, while the minimal set lets it walk.
 # Built per-task so the feet_air_time threshold follows the robot's gait speed.
 def _reward_terms(cfg):
+    if getattr(cfg, "reward", "isaaclab") == "biped":
+        # IsaacLab H1 velocity recipe (proven biped). Key biped differences vs the quad recipes:
+        # NO lin_vel_z penalty (a biped bobs vertically), track_ang weight 1.0, feet_air_time +
+        # feet_slide on the ankle "feet", MILD flat_orientation (-1.0, not -5/-10), and
+        # similar_to_default to keep the arms/torso from flailing. No base_height term.
+        return [
+            rl.RewardTerm("track_lin_vel_xy",   rl.rewards.track_lin_vel_xy_exp,   1.0,    {"std": 0.5}),
+            rl.RewardTerm("track_ang_vel_z",    rl.rewards.track_ang_vel_z_exp,    1.0,    {"std": 0.5}),
+            rl.RewardTerm("feet_air_time",      rl.rewards.feet_air_time,          0.25,
+                          {"threshold": cfg.feet_air_time_threshold}),
+            rl.RewardTerm("feet_slide",         rl.rewards.feet_slide,            -0.25),
+            rl.RewardTerm("flat_orientation",   rl.rewards.flat_orientation_l2,   -1.0),
+            rl.RewardTerm("action_rate",        rl.rewards.action_rate_l2,        -0.005),
+            rl.RewardTerm("dof_acc",            rl.rewards.dof_acc_l2,            -1.25e-7),
+            rl.RewardTerm("similar_to_default", rl.rewards.joint_deviation_l1,    -0.1),
+        ]
     if getattr(cfg, "reward", "isaaclab") == "genesis":
         return [
             # std=0.5 so the exp kernel is exp(-err²/0.25) — matches Genesis tracking_sigma=0.25
@@ -185,7 +201,7 @@ class LeggedVelocityTask(rl.VecTask):
             headless=headless, instanceable=instanceable,
             config=rl.SimConfig(dt=1.0 / 50.0, substeps=SUBSTEPS, device="auto",
                                 gpu_contact_buffer_multiplier=_gpu_mult),
-            title=f"{type(self).__name__} (vel-cmd)")
+            title=f"{getattr(c, 'name', type(self).__name__)} (vel-cmd)")
         sim.play()
         super().__init__(sim, runner, num_obs=12 + 3 * self.n_dof, num_actions=self.n_dof,
                          name=getattr(c, "name", "Legged"),
@@ -209,8 +225,9 @@ class LeggedVelocityTask(rl.VecTask):
         self._last_action = torch.zeros(self.num_envs, nd, device=dev)
         self._cmd = _parse_cmd(self.cfg.cmd)
         # Settle onto the feet before capturing the home/reset pose (the batch is "ready"
-        # before the robot settles, else every reset drops into a crouch).
-        for _ in range(80):
+        # before the robot settles, else every reset drops into a crouch). A biped must
+        # capture EARLY (short settle) — it tips open-loop before a quadruped-length settle.
+        for _ in range(int(getattr(self.cfg, "settle_steps", 80))):
             self.sim.set_dof_position_target_tensor(self._default_dof)
             self.sim.simulate(); self.sim.fetch_results()
             if self.runner is not None:
@@ -306,6 +323,12 @@ class LeggedVelocityTask(rl.VecTask):
     def _compute_reward(self):
         self.rew_buf = self.rewards.compute()
         self.reset_buf = self.terminations.compute()
+        grace = int(getattr(self.cfg, "contact_grace_steps", 0))
+        if grace > 0:
+            # A just-reset env can register a 1-frame teleport contact spike (the biped
+            # momentarily penetrates the ground before settling onto its feet). Don't let a
+            # contact-based termination fire during the short post-reset grace window.
+            self.reset_buf = self.reset_buf * (self.progress_buf >= float(grace))
         self._nstep += 1
         if self._nstep == 10 and not getattr(self, "_driven", False):
             self._driven = True

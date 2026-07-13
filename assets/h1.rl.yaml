@@ -1,0 +1,42 @@
+# Unitree H1 humanoid — MuJoCo Menagerie MJCF (assets/h1/, BSD-3, Unitree Robotics).
+# Bipedal velocity locomotion. Stance + per-joint PD gains follow IsaacLab's H1 velocity task
+# (isaaclab_assets H1_CFG): the proven biped setup (soft ankles Kp20, stiff legs, mild arms).
+
+floating_base: true
+
+default_joint_angles:                # IsaacLab H1 init pose (radians)
+  left_hip_yaw: 0.0
+  left_hip_roll: 0.0
+  left_hip_pitch: -0.28
+  left_knee: 0.79
+  left_ankle: -0.52
+  right_hip_yaw: 0.0
+  right_hip_roll: 0.0
+  right_hip_pitch: -0.28
+  right_knee: 0.79
+  right_ankle: -0.52
+  torso: 0.0
+  left_shoulder_pitch: 0.28
+  left_shoulder_roll: 0.0
+  left_shoulder_yaw: 0.0
+  left_elbow: 0.52
+  right_shoulder_pitch: 0.28
+  right_shoulder_roll: 0.0
+  right_shoulder_yaw: 0.0
+  right_elbow: 0.52
+
+actuated_joints: ["*"]               # all 19 joints (policy controls arms too)
+
+# Per-joint PD gains (IsaacLab H1). default = hip_yaw/roll; groups override the rest.
+# Ankles are SOFT (Kp20) — Kp300 everywhere made them unstable; legs are stiff (150-200).
+drive:
+  default: { stiffness: 200.0, damping: 6.0, max_force: 300.0, drive_type: force }
+  groups:
+    - { match: "*hip_pitch", stiffness: 300.0, damping: 8.0,  max_force: 300.0, drive_type: force }
+    - { match: "*knee",      stiffness: 300.0, damping: 8.0,  max_force: 300.0, drive_type: force }
+    - { match: "torso",      stiffness: 300.0, damping: 8.0,  max_force: 300.0, drive_type: force }
+    - { match: "*ankle",     stiffness: 40.0,  damping: 4.0,  max_force: 100.0, drive_type: force }
+    - { match: "*shoulder*", stiffness: 40.0,  damping: 10.0, max_force: 300.0, drive_type: force }
+    - { match: "*elbow",     stiffness: 40.0,  damping: 10.0, max_force: 300.0, drive_type: force }
+
+display_color: [0.85, 0.85, 0.88]
