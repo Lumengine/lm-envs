@@ -207,6 +207,27 @@ class FrankaLiftConfig(BaseConfig):
     reset_joint_noise: float = 0.10
 
 
+@dataclass
+class FrankaCabinetConfig(BaseConfig):
+    """Franka Panda opens a cabinet drawer (IsaacGym FrankaCabinet port) — the first
+    MULTI-ARTICULATION task: every env holds the arm AND a passive 4-DOF sektion
+    cabinet, both fixed-base, in one direct-GPU batch."""
+    name: str = "FrankaCabinet"
+    robot: str = "franka/panda.xml"                  # WITH the gripper
+    rl_yaml: str = "franka_cabinet.rl.yaml"
+    cabinet: str = "sektion_cabinet/urdf/sektion_cabinet_2.urdf"
+    cabinet_yaml: str = "sektion_cabinet/sektion_cabinet.rl.yaml"
+    num_dof: int = 9                                 # the ARM's DOFs (7 + 2 fingers)
+    num_envs: int = 4096
+    env_spacing: float = 3.0
+    cabinet_x: float = 1.0                           # cabinet base offset from the arm (m)
+    cabinet_z: float = 0.4                           # cabinet base height (IsaacGym pose)
+    action_scale: float = 7.5                        # delta-target rate (IsaacGym actionScale)
+    dof_vel_scale: float = 0.1
+    open_target: float = 0.39                        # drawer travel = success (m)
+    reset_joint_noise: float = 0.125                 # IsaacGym: 0.25/2
+
+
 # ── layering helpers ─────────────────────────────────────────────────────────
 
 def _coerce(value, to_type):

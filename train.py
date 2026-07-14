@@ -45,6 +45,10 @@ def main():
     ap.add_argument("--config", help="path to a YAML config (default: configs/<Task>.yaml if present)")
     ap.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
                     help="override any config field (repeatable), e.g. --set terrain=noise")
+    ap.add_argument("--resume-from", default=None,
+                    help="checkpoint .pth to restore + continue training from (rl_games); "
+                         "used by train_segments.py to chain a long run around a flaky "
+                         "process death")
     args = ap.parse_args()
 
     if args.list or not args.task:
@@ -86,6 +90,8 @@ def main():
             kw = dict(max_epochs=epochs, seed=cfg.seed, **spec.train_kwargs)
             if ppo is not None:
                 kw["params"] = ppo
+            if args.resume_from:
+                kw["resume_from"] = args.resume_from
             rl.train_rl_games(task, **kw)
     except BaseException:
         import traceback

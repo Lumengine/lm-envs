@@ -1,0 +1,36 @@
+# Franka Emika Panda arm + gripper — cabinet (drawer-opening) variant.
+# IsaacGym FrankaCabinet uses DELTA-target control (targets += speed*dt*action),
+# where the stiffer 400/80 gains track the incrementally-moving target (this is
+# NOT the absolute joint-position 80/4 set used by Reach/Lift). Default pose =
+# IsaacGym's franka_default_dof_pos (reaching toward the drawer), fingers 0.035.
+# Joint speed limits = the real Franka (rad/s; fingers m/s).
+
+floating_base: false
+
+default_joint_angles:
+  joint1: 1.157
+  joint2: -1.066
+  joint3: -0.155
+  joint4: -2.239
+  joint5: -1.841
+  joint6: 1.003
+  joint7: 0.469
+  finger_joint1: 0.035
+  finger_joint2: 0.035
+
+actuated_joints: ["*"]
+
+drive:
+  default: { stiffness: 400.0, damping: 80.0, max_force: 87.0, drive_type: force,
+             max_joint_velocity: 2.175 }
+  groups:
+    - { match: "joint5", stiffness: 400.0, damping: 80.0, max_force: 12.0, drive_type: force,
+        max_joint_velocity: 2.61 }
+    - { match: "joint6", stiffness: 400.0, damping: 80.0, max_force: 12.0, drive_type: force,
+        max_joint_velocity: 2.61 }
+    - { match: "joint7", stiffness: 400.0, damping: 80.0, max_force: 12.0, drive_type: force,
+        max_joint_velocity: 2.61 }
+    - { match: "finger_joint*", stiffness: 2000.0, damping: 100.0, max_force: 200.0,
+        drive_type: force, max_joint_velocity: 0.2 }
+
+display_color: [0.92, 0.92, 0.94]

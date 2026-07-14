@@ -3,7 +3,14 @@
 IsaacLab lift-style MDP on the free-rigid-body tensor API: the cube is a dynamic
 per-env Box observed via acquire_free_body_state_tensor and reset by writing the
 batch state back. The MJCF gripper tendon is emulated by mirroring ONE gripper
-action onto both finger PD targets (open 0.04 m / closed 0).
+action onto both finger PD targets — CONTINUOUS: action in [-1, 1] maps linearly
+to the finger opening [0, 0.04 m] (IsaacLab's binary open/close is the special
+case of saturating this).
+
+Rewards run through rl.RewardManager (dt_scale=False keeps the validated scale)
+so the IsaacLab lift curriculum applies natively: modify_reward_weight hardens
+action_rate/joint_vel from -1e-4 to -1e-1 after 10k global steps — smoothness is
+only enforced once the grasp behavior exists.
 
 Run via the CLI:
     python train.py --task FrankaLift
@@ -24,6 +31,36 @@ CLIP_OBS = 5.0
 MAX_EPISODE_LENGTH = 300
 SUBSTEPS = 2
 DOF_VEL_SCALE = 0.1
+GRIP_RATE = 0.005      # m/step: full 4 cm travel in ~8 steps (~0.16 s at 50 Hz)
+
+# -- reward terms (RewardManager funcs) — the SAME math as the validated v11
+# inline reward, split per term so modify_reward_weight can retune weights live.
+# They read per-step values cached by _compute_reward (_d_reach/_lifted/_d_goal).
+
+def _r_reach(task):
+    # Coarse L2 pull + fine tanh kernel: the tanh(d/0.1) alone is FLAT beyond
+    # ~25 cm (saturated), giving zero approach signal from the 42 cm spawn pose.
+    # CLAMPED: an ejected cube would otherwise inject a -10^4-scale reward that
+    # destroys the value function (v5 collapsed to reward -4.5M).
+    d = task._d_reach
+    return 1.0 - task._torch.tanh(d / 0.1) - 0.2 * d.clamp(max=1.0)
+
+
+def _r_lifted(task):
+    return task._lifted
+
+
+def _r_goal(task, std):
+    return (1.0 - task._torch.tanh(task._d_goal / std)) * task._lifted
+
+
+def _r_action_rate(task):
+    return (task._last_action - task._prev_action).square().sum(dim=1)
+
+
+def _r_joint_vel(task):
+    return task._dof[:, :9, 1].square().sum(dim=1)
+
 
 FRANKA_LIFT_PPO_PARAMS = {"params": {
     "network": {"mlp": {"units": [256, 128, 64]}},
@@ -82,6 +119,24 @@ class FrankaLiftTask(rl.VecTask):
         super().__init__(sim, runner, num_obs=35, num_actions=8,
                          name=c.name, clip_obs=CLIP_OBS,
                          max_episode_length=MAX_EPISODE_LENGTH, seed=int(c.seed))
+        # IsaacLab lift reward set (weights = the validated v11 inline reward;
+        # dt_scale=False keeps the raw per-step scale those weights were tuned at).
+        self.rewards = rl.RewardManager(self, [
+            rl.RewardTerm("reach",       _r_reach,        1.0),
+            rl.RewardTerm("lifted",      _r_lifted,      15.0),
+            rl.RewardTerm("goal",        _r_goal,        16.0, {"std": 0.3}),
+            rl.RewardTerm("goal_fine",   _r_goal,         5.0, {"std": 0.05}),
+            rl.RewardTerm("action_rate", _r_action_rate, -1e-4),
+            rl.RewardTerm("joint_vel",   _r_joint_vel,   -1e-4),
+        ], dt_scale=False)
+        # IsaacLab lift curriculum: harden the smoothness penalties x1000 once the
+        # grasp behavior exists (10k global steps ~= epoch 417 at horizon 24).
+        self.curriculum = rl.CurriculumManager(self, [
+            rl.CurrTerm("action_rate", rl.modify_reward_weight,
+                        {"term_name": "action_rate", "weight": -1e-1, "num_steps": 10000}),
+            rl.CurrTerm("joint_vel", rl.modify_reward_weight,
+                        {"term_name": "joint_vel", "weight": -1e-1, "num_steps": 10000}),
+        ])
 
     # -- task hooks ---------------------------------------------------------
 
@@ -125,6 +180,8 @@ class FrankaLiftTask(rl.VecTask):
         self._goal[:, 2] = c.goal_z
         self._last_action = torch.zeros(self.num_envs, 8, device=dev)
         self._prev_action = torch.zeros(self.num_envs, 8, device=dev)
+        # Persistent gripper target (delta-controlled), starts OPEN like the pose.
+        self._grip_target = torch.full((self.num_envs, 1), 0.04, device=dev)
 
     def cube_pos(self):
         return self._cube[self._cube_env_row, 0:3]
@@ -140,9 +197,17 @@ class FrankaLiftTask(rl.VecTask):
         targets = self._default_dof.clone()
         arm_t = self._default_dof[:, self._arm_idx] + self.cfg.action_scale * actions[:, 0:7]
         targets[:, self._arm_idx] = arm_t
-        # One gripper action drives both (tendon-coupled on the real robot): >0 open, <0 close.
-        grip = torch.where(actions[:, 7:8] > 0.0, 0.04, 0.0)
-        targets[:, self._finger_idx] = grip
+        # One gripper action drives both (tendon-coupled on the real robot) —
+        # CONTINUOUS as a DELTA-target (IsaacGym-cabinet style): the action is a
+        # closing/opening RATE integrated into a persistent target saturating at
+        # the rails [0, 0.04]. v12 proved a direct linear mapping kills
+        # exploration (policy noise around 0 puts the fingers exactly at the
+        # 4 cm cube surface -> zero grip force -> `lifted` never discovered);
+        # the integrator random-walks INTO the rails, where full squeeze lives,
+        # while the policy can still hold any intermediate aperture.
+        self._grip_target = (self._grip_target
+                             + GRIP_RATE * actions[:, 7:8]).clamp(0.0, 0.04)
+        targets[:, self._finger_idx] = self._grip_target
         self.sim.set_dof_position_target_tensor(targets)
 
     def _compute_observations(self):
@@ -163,24 +228,13 @@ class FrankaLiftTask(rl.VecTask):
         torch = self._torch; c = self.cfg
         ee = self.grasp_pos()
         cube = self.cube_pos()
-        d_reach = (ee - cube).norm(dim=1)
-        # Coarse L2 pull + fine tanh kernel: the tanh(d/0.1) alone is FLAT beyond
-        # ~25 cm (saturated), giving zero approach signal from the 42 cm spawn pose —
-        # the linear term is what made FrankaReach converge (IsaacLab reach shaping).
-        # CLAMPED: a pinched cube can be ejected kilometres in one step, and an
-        # unbounded -0.2*d then injects a -10^4-scale reward that destroys the value
-        # function (v5 collapsed to reward -4.5M). Bounded pull = -0.2/step worst case.
-        reach = 1.0 - torch.tanh(d_reach / 0.1) - 0.2 * d_reach.clamp(max=1.0)
+        # Per-step values the RewardManager terms read (computed once, shared).
+        self._d_reach = (ee - cube).norm(dim=1)
         # IsaacLab lift MDP: lifted is NOT hold-gated — the anti-batting mechanism is
         # structural instead (knocking the cube off the pedestal terminates below).
-        lifted = (cube[:, 2] > c.pedestal_height + c.lift_min_height).float()
-        d_goal = (cube - self._goal).norm(dim=1)
-        goal = (1.0 - torch.tanh(d_goal / 0.3)) * lifted
-        goal_fine = (1.0 - torch.tanh(d_goal / 0.05)) * lifted
-        action_rate = (self._last_action - self._prev_action).square().sum(dim=1)
-        joint_vel = self._dof[:, :9, 1].square().sum(dim=1)
-        self.rew_buf = (1.0 * reach + 15.0 * lifted + 16.0 * goal + 5.0 * goal_fine
-                        - 1e-4 * action_rate - 1e-4 * joint_vel)
+        self._lifted = (cube[:, 2] > c.pedestal_height + c.lift_min_height).float()
+        self._d_goal = (cube - self._goal).norm(dim=1)
+        self.rew_buf = self.rewards.compute()
         # object_dropping: the cube left the pedestal (below its top) -> episode ends.
         # A NON-FINITE cube state counts as dropped too: a hard finger pinch can eject
         # the cube violently or NaN it in deep interpenetration, and clamp(NaN)=NaN
@@ -216,7 +270,10 @@ class FrankaLiftTask(rl.VecTask):
         self.sim.set_free_body_state_tensor_indexed(self._cube, rows)
         self._last_action[env_ids] = 0.0
         self._prev_action[env_ids] = 0.0
+        self._grip_target[env_ids] = 0.04            # fingers back to open
         self.progress_buf[env_ids] = 0.0
+        self.rewards.reset(env_ids)
+        self.curriculum.compute(env_ids)
 
 
 def _frame_camera(task):

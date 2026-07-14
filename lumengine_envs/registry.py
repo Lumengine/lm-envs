@@ -14,8 +14,8 @@ Migration note: tasks currently live as top-level modules under `tasks/` (e.g.
 import importlib
 from dataclasses import dataclass, field
 
-from .config import (A1Config, AntConfig, AnymalConfig, CartpoleConfig, FrankaLiftConfig,
-                     FrankaReachConfig, Go1Config, Go2Config, H1Config)
+from .config import (A1Config, AntConfig, AnymalConfig, CartpoleConfig, FrankaCabinetConfig,
+                     FrankaLiftConfig, FrankaReachConfig, Go1Config, Go2Config, H1Config)
 
 
 @dataclass(frozen=True)
@@ -86,6 +86,13 @@ REGISTRY: dict[str, TaskSpec] = {
         domain="manipulation", desc="Franka Panda + gripper - grasp a cube and hold it at a goal height.",
         default_envs=4096, max_epochs=1000,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="FRANKA_LIFT_PPO_PARAMS"),
+
+    "FrankaCabinet": TaskSpec(
+        id="FrankaCabinet", module="franka_cabinet", cls="FrankaCabinetTask",
+        config_cls=FrankaCabinetConfig,
+        domain="manipulation", desc="Franka Panda opens a cabinet drawer (multi-articulation env).",
+        default_envs=4096, max_epochs=1500,
+        train_kwargs={"horizon_length": 16, "mini_epochs": 8}, ppo_attr="FRANKA_CABINET_PPO_PARAMS"),
 }
 
 

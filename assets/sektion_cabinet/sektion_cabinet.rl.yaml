@@ -1,0 +1,16 @@
+# Sektion cabinet (IsaacGymEnvs FrankaCabinet target) — a PASSIVE fixed-base
+# articulation: 6 DOFs (door_left/right revolute + their small mimic "shift"
+# prismatics + drawer_top/bottom prismatic). IsaacGym sets drive mode NONE with
+# DOF damping 10 on every joint; a force PD with kp=0 / kd=10 and a zero velocity
+# target is the same viscous damping through our drive pipeline.
+
+floating_base: false
+
+default_joint_angles: {}                 # everything closed
+
+actuated_joints: ["*"]
+
+drive:
+  default: { stiffness: 0.0, damping: 10.0, max_force: 1000.0, drive_type: force }
+
+display_color: [0.55, 0.42, 0.30]

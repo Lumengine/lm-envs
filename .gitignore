@@ -14,3 +14,6 @@ assets/anymal_converted/
 # run/monitor logs at the repo root (train/play stdout captures)
 /*.log
 /*.err
+
+physx561/
+px_*.zip
