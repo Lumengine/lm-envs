@@ -205,6 +205,10 @@ class FrankaLiftConfig(BaseConfig):
     goal_z: float = 0.30                     # lift goal height above ground (m)
     lift_min_height: float = 0.04            # "lifted" = cube this far above the pedestal top
     reset_joint_noise: float = 0.10
+    # Global-step threshold at which the curriculum hardens the smoothness penalties
+    # x1000 (default ~epoch 417 for from-scratch; set 0 to harden immediately when
+    # REFINING an already-grasping policy via --resume-from, to smooth the end tremble).
+    curriculum_start_steps: int = 10000
 
 
 @dataclass

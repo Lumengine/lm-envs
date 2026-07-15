@@ -130,12 +130,16 @@ class FrankaLiftTask(rl.VecTask):
             rl.RewardTerm("joint_vel",   _r_joint_vel,   -1e-4),
         ], dt_scale=False)
         # IsaacLab lift curriculum: harden the smoothness penalties x1000 once the
-        # grasp behavior exists (10k global steps ~= epoch 417 at horizon 24).
+        # grasp behavior exists. `curriculum_start_steps` is the global-step threshold
+        # (~epoch 417 at horizon 24 for a from-scratch run; 0 to harden immediately
+        # when REFINING an already-grasping policy via --resume-from, which smooths
+        # the end-hold tremble without waiting).
+        n = int(getattr(c, "curriculum_start_steps", 10000))
         self.curriculum = rl.CurriculumManager(self, [
             rl.CurrTerm("action_rate", rl.modify_reward_weight,
-                        {"term_name": "action_rate", "weight": -1e-1, "num_steps": 10000}),
+                        {"term_name": "action_rate", "weight": -1e-1, "num_steps": n}),
             rl.CurrTerm("joint_vel", rl.modify_reward_weight,
-                        {"term_name": "joint_vel", "weight": -1e-1, "num_steps": 10000}),
+                        {"term_name": "joint_vel", "weight": -1e-1, "num_steps": n}),
         ])
 
     # -- task hooks ---------------------------------------------------------
