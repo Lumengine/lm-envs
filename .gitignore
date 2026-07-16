@@ -8,8 +8,9 @@ imgui.ini
 assets/world*.usd
 assets/w_*.usd
 # real anymal_c robot — large meshes/textures + ANYbotics license; NOT vendored.
-# Regenerate via urdf_usd_converter (config-driven prep reads assets/anymal_c.rl.yaml).
+# Regenerate via scripts/fetch_assets.py (pinned ANYbotics commit + engine converter).
 assets/anymal_converted/
+assets/anymal_c_simple_description/
 
 # run/monitor logs at the repo root (train/play stdout captures)
 /*.log

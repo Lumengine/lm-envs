@@ -28,7 +28,8 @@ downloaded by `scripts/fetch_assets.py` (not committed) · `planned` = not yet a
 | Universal Robots UR5e | BSD-3-Clause | ROS-Industrial (description only) | planned |
 | Kinova Gen3 / Jaco2 | BSD-3-Clause (© Kinova) | Kinova ROS | planned |
 | Shadow Hand | Apache-2.0 | shadow-robot/sr_common + OpenAI | planned |
-| Allegro Hand (w/ KUKA) | BSD-2-Clause | TU Munich kuka_allegro_description | planned |
+| Allegro Hand | BSD-3-Clause (© 2016 SimLab / Wonik Robotics) | MuJoCo Menagerie (wonik_allegro); see assets/allegro/LICENSE | vendored |
+| Sektion cabinet | BSD-3-Clause (© NVIDIA) | github.com/isaac-sim/IsaacGymEnvs (repo, not Isaac Sim); see assets/sektion_cabinet/PROVENANCE.md | vendored |
 | Trifinger | BSD-3-Clause (© Max Planck) | github.com/rr-learning/rrc_simulation | planned |
 | Crazyflie (drone) | Apache-2.0 / MIT | Bitcraze / Genesis | planned |
 | YCB objects | CC-BY-4.0 (data), MIT (code) | Yale-CMU-Berkeley (ycbbenchmarks.org) | planned |
