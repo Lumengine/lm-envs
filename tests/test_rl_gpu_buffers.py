@@ -38,8 +38,12 @@ def run():
     settings = core.get_settings()
     got_c = settings.get_as_int(PATH_CONTACTS)
     got_fl = settings.get_as_int(PATH_FOUNDLOST)
-    assert got_c == MULT * (1 << 20), f"maxRigidContactCount={got_c}"
-    assert got_fl == MULT * (256 << 10), f"foundLostPairsCapacity={got_fl}"
+    # Expected = the facade's PhysX-default constants x MULT — import them instead of
+    # copying values (the deliberate 256K->512K foundLost bump for terrain scenes
+    # already went stale here once).
+    from lm.rl import _view as _lmview
+    assert got_c == MULT * _lmview._PHYSX_DEFAULT_CONTACTS, f"maxRigidContactCount={got_c}"
+    assert got_fl == MULT * _lmview._PHYSX_DEFAULT_FOUNDLOST, f"foundLostPairsCapacity={got_fl}"
     print(f"[test] settings applied: maxRigidContactCount={got_c} foundLostPairsCapacity={got_fl}")
 
     # The scene built and steps with the enlarged buffer (a too-small buffer would error/overflow).

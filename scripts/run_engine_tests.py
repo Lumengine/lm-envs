@@ -34,9 +34,14 @@ def _engine_ready() -> bool:
 
 def _run_one(label: str, cmd: list, timeout: int):
     t0 = time.time()
+    # The direct-GPU torch interop needs the shared CUDA context. The tiered
+    # harness sets it itself; the legacy contract tests (tests/test_rl_*.py)
+    # expect the CALLER to — so the runner guarantees it for every child.
+    env = dict(os.environ)
+    env.setdefault("LM_PHYSX_SHARE_CUDA_CONTEXT", "1")
     try:
         proc = subprocess.run(cmd, cwd=str(REPO), timeout=timeout,
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, env=env)
         dt = time.time() - t0
         out = (proc.stdout or "") + (proc.stderr or "")
         if proc.returncode == 0:

@@ -10,15 +10,18 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
 import _bootstrap
 _bootstrap.bootstrap()
 import lm.rl as rl
 import anymal_task as A
+from lumengine_envs.config import AnymalConfig
 
 ROBOT = _bootstrap.ASSETS / "anymal_converted" / "anymal.usda"
 WORLD = _bootstrap.ASSETS / "world_instanceable_test.usd"
 NUM_ENVS = 64
+_CFG = AnymalConfig()      # ground_z/env_spacing moved from module constants to the config
 
 
 def run():
@@ -27,8 +30,8 @@ def run():
         print("[test] SKIP: CUDA not available")
         return 0
 
-    rl.author_world(ROBOT, WORLD, num_envs=NUM_ENVS, spacing=A.ENV_SPACING,
-                    ground=True, ground_z=A.GROUND_Z, spawn_z=0.0, instanceable=True)
+    rl.author_world(ROBOT, WORLD, num_envs=NUM_ENVS, spacing=_CFG.env_spacing,
+                    ground=True, ground_z=_CFG.ground_z, spawn_z=0.0, instanceable=True)
 
     # The authored stage shares one env prototype (memory win): all env_i are USD instances
     # of a single prototype.
