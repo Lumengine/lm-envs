@@ -1,10 +1,10 @@
 """Tier 0 — every registry task's default config points at assets that exist.
 
 Engine-free. Assets with status `fetched` in THIRD_PARTY_LICENSES.md (anymal)
-are allowed to be absent on a fresh clone: the test then FAILS with a pointer
-to scripts/fetch_assets.py unless the file exists — run the fetch script once
-per machine. (A skip would hide a broken clone forever; a directed failure is
-the honest signal. Use --deselect if you really don't want Anymal.)
+are allowed to be absent on a machine that cannot regenerate them (no engine =
+no converter — a hosted CI runner): there they SKIP. On a machine WITH the
+engine, a missing fetched asset FAILS with a pointer to scripts/fetch_assets.py
+— a dev box has no excuse, and a skip would hide the broken clone forever.
 """
 from pathlib import Path
 
@@ -15,8 +15,29 @@ from lumengine_envs.registry import REGISTRY
 REPO = Path(__file__).resolve().parents[2]
 ASSETS = REPO / "assets"
 
-# Assets documented as fetched-not-committed (see THIRD_PARTY_LICENSES.md).
+
+def _engine_available():
+    import os
+    root = os.environ.get("LUMENGINE_ROOT")
+    if not root:
+        return False
+    cfg = os.environ.get("LUMENGINE_BUILD_CONFIG", "Release")
+    return (Path(root) / "build" / cfg / "python").exists()
+
+# Assets documented as fetched-not-committed (see THIRD_PARTY_LICENSES.md),
+# keyed by the path prefix their configs reference.
+FETCHED_PREFIXES = ("anymal_converted/",)
 FETCHED_HINT = "missing fetched asset — run:  python scripts/fetch_assets.py"
+
+
+def _require(spec_id, field, rel):
+    """Missing asset -> skip (unfetchable here) or fail (dev box), per docstring."""
+    if (ASSETS / rel).exists():
+        return
+    if rel.startswith(FETCHED_PREFIXES) and not _engine_available():
+        pytest.skip(f"{spec_id}.{field}: assets/{rel} is a fetched asset and this "
+                    f"machine has no engine to convert it (fine on hosted CI)")
+    pytest.fail(f"{spec_id}.{field} -> assets/{rel} missing. {FETCHED_HINT}")
 
 
 def _asset_fields(cfg):
@@ -32,8 +53,7 @@ def test_default_assets_exist(spec):
     cfg = spec.config_cls()
     checked = 0
     for field, rel in _asset_fields(cfg):
-        p = ASSETS / rel
-        assert p.exists(), f"{spec.id}.{field} -> assets/{rel} missing. {FETCHED_HINT}"
+        _require(spec.id, field, rel)
         checked += 1
     if spec.id == "Cartpole":
         # Cartpole's robot_usd="" means "the vendored cartpole" — check it directly.
@@ -55,9 +75,8 @@ def test_rl_yaml_parses(spec):
         rel = getattr(cfg, field, "") or ""
         if not rel:
             continue
+        _require(spec.id, field, rel)
         p = ASSETS / rel
-        if not p.exists():
-            pytest.fail(f"{spec.id}.{field} missing: assets/{rel}. {FETCHED_HINT}")
         with open(p, "r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
         assert isinstance(data, dict) and data, f"assets/{rel} is empty or not a mapping"
