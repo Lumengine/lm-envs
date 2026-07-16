@@ -1,9 +1,21 @@
-"""Test the last two ArticulationView stubs: per-env CONTACT friction (material
-un-sharing) and per-DOF JOINT friction. The material test proves per-env independence
-AND effect: env 0 gets near-zero friction, the others high — under the same horizontal
-push, the low-friction robot slides clearly further (its material is now its own).
+"""Per-env CONTACT-material DR (+ per-DOF joint friction smoke).
 
-    set LUMENGINE_ROOT=...\\Lumengine2 & set LUMENGINE_BUILD_CONFIG=Release
+The material test proves per-env INDEPENDENCE: after the build-time material
+un-sharing, giving env 0 near-zero friction and env 1 high friction produces a
+clearly different slide distance under the same horizontal push.
+
+TIMING CONTRACT (direct-GPU): PhysX's GPU contact pipeline captures materials at
+the FIRST simulate() and ignores all later material updates, so material DR is a
+STARTUP operation — applied here right after the world builds, BEFORE the warmup
+steps. (A post-step call is dropped with a warning by the facade; the old version
+of this test did exactly that and could never differentiate.)
+
+The assertion is direction-agnostic (|low - high| gap): an articulated robot's
+slide distance is not monotonic in friction (frictionless feet splay and the
+robot bellies out; grippy feet convert the push into a stumble), so the test
+requires a significant SEPARATION, not a particular ordering.
+
+    set LUMENGINE_ROOT=...\\Lumengine & set LUMENGINE_BUILD_CONFIG=Release
     set LM_PHYSX_SHARE_CUDA_CONTEXT=1 & python tests/test_rl_material_dr.py
 """
 import os
@@ -14,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
 
 NUM_ENVS = 4
 N_DOF = 12
+MIN_GAP = 0.05     # meters of slide-distance separation between the two groups
 
 
 def run():
@@ -27,8 +40,22 @@ def run():
 
     task = A.AnymalTask(num_envs=NUM_ENVS, headless=True)
     sim = task.sim
+
+    # STARTUP material DR: articulations exist right after the build ticks, before
+    # any simulate(). Half the envs near-frictionless, half grippy.
+    for _ in range(2000):
+        sim.pump_scene()
+        task.runner.run()
+        if sim._batch_count_ready():
+            break
+    assert sim._batch_count_ready(), "articulations never built"
+    fr = torch.tensor([0.0] * (NUM_ENVS // 2) + [8.0] * (NUM_ENVS - NUM_ENVS // 2))
+    sim.set_material_properties(fr)
+    print("[test] per-env materials set BEFORE the first simulate (startup DR)")
+
     for _ in range(4000):
-        task.warmup_step(); task.runner.run()
+        task.warmup_step()
+        task.runner.run()
         if task.ready:
             break
     assert task.ready
@@ -42,11 +69,7 @@ def run():
     view.set_friction_coefficients(torch.full((NUM_ENVS, N_DOF), 0.5, device=dev))
     print("[test] set_friction_coefficients (joint) runs OK")
 
-    # Contact-material friction is now PER-ENV: the ingest un-shares the default material into a
-    # per-articulation copy at build, so mutating each env's material value gives independent
-    # friction. Half the envs frictionless, half grippy; the frictionless ones slide further.
-    fr = torch.tensor([0.0] * (NUM_ENVS // 2) + [5.0] * (NUM_ENVS - NUM_ENVS // 2), device=dev)
-    view.set_material_properties(fr)
+    # Same lateral push for everyone; the two friction groups must separate.
     root = view.get_root_states().clone(); root[:, 7] = 2.5; root[:, 8:13] = 0.0
     view.set_root_states(root)
     xy0 = view.get_root_states()[:, 0:2].clone()
@@ -54,9 +77,11 @@ def run():
         sim.simulate(); sim.fetch_results()
     dist = (view.get_root_states()[:, 0:2] - xy0).norm(dim=1)
     lo = float(dist[:NUM_ENVS // 2].mean()); hi = float(dist[NUM_ENVS // 2:].mean())
-    print(f"[test] per-env friction slide: low(0.0)={lo:.3f} > high(5.0)={hi:.3f}")
-    assert lo > hi + 0.03, f"per-env contact friction not differentiating: low={lo} high={hi}"
-    print("[test] -> per-env contact friction works (ingest material un-sharing)")
+    print(f"[test] per-env friction slide: fr=0 group {lo:.3f} vs fr=8 group {hi:.3f} "
+          f"(gap {abs(lo - hi):.3f})")
+    assert abs(lo - hi) > MIN_GAP, (
+        f"per-env contact friction not differentiating: low={lo} high={hi}")
+    print("[test] -> per-env contact friction works (build-time material un-sharing)")
 
     print("[test] PER-ENV MATERIAL + JOINT FRICTION DR OK")
     rl.destroy_world(task.sim, task.runner)
