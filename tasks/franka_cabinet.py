@@ -65,7 +65,7 @@ class FrankaCabinetTask(rl.VecTask):
         # toward the arm. Same env partition -> collides with its arm only.
         self.cabinet = self.world.add_robot(
             rl.Urdf(str(ASSETS / c.cabinet), prep=True, config=str(ASSETS / c.cabinet_yaml)),
-            name="cabinet", at=(c.cabinet_x, 0.0), yaw=math.pi, spawn_z=c.cabinet_z)
+            name="cabinet", at=(c.cabinet_x, 0.0), rpy=(0.0, 0.0, math.pi), spawn_z=c.cabinet_z)
         sim, runner = self.world.build(
             headless=c.headless,
             config=rl.SimConfig(dt=1.0 / 60.0, substeps=SUBSTEPS, device="auto",

@@ -232,6 +232,37 @@ class FrankaCabinetConfig(BaseConfig):
     reset_joint_noise: float = 0.125                 # IsaacGym: 0.25/2
 
 
+@dataclass
+class AllegroCubeConfig(BaseConfig):
+    """Wonik Allegro Hand in-hand cube reorientation (IsaacGym AllegroHand port). A
+    fixed-base 16-DOF hand mounted palm-up cradles a per-env cube and must rotate it to
+    match a random goal orientation. Reward = 1/(orientation distance) + success bonus −
+    penalties; drop the cube (or reach the goal) and the episode/goal resets."""
+    name: str = "AllegroCube"
+    robot: str = "allegro/right_hand.xml"
+    rl_yaml: str = "allegro.rl.yaml"
+    num_dof: int = 16                                # 4 fingers x 4 joints
+    num_envs: int = 8192                             # in-hand reorientation needs many envs
+    env_spacing: float = 0.5
+    hand_pitch: float = 0.0                          # default MJCF orientation is already palm-UP
+    hand_z: float = 0.4                              # palm height above the ground
+    action_scale: float = 0.3                        # position-target delta per step (rad)
+    dof_vel_scale: float = 0.1
+    cube_size: float = 0.045                         # cube edge (m)
+    cube_z_offset: float = 0.02                      # cube spawn height above the palm (m)
+    cube_xy_noise: float = 0.01                      # reset XY jitter (m)
+    # Reward scales — IsaacGym AllegroHand.
+    dist_reward_scale: float = -10.0                 # position drift penalty (keeps cube in hand)
+    rot_eps: float = 0.1                             # 1/(rot_dist+eps) reward kernel
+    rot_reward_scale: float = 1.0
+    reach_goal_bonus: float = 250.0                  # bonus when the goal orientation is hit
+    success_tolerance: float = 0.1                   # rad: |rot_dist| below this = success
+    action_penalty_scale: float = -0.0002
+    fall_penalty: float = 0.0                        # AllegroHand uses 0 (drop just resets)
+    fall_dist: float = 0.24                          # cube this far from the palm = dropped
+    reset_joint_noise: float = 0.05
+
+
 # ── layering helpers ─────────────────────────────────────────────────────────
 
 def _coerce(value, to_type):

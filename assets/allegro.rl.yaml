@@ -1,0 +1,34 @@
+# Wonik Allegro Hand (right) — MuJoCo Menagerie MJCF (assets/allegro/, BSD-3, Wonik Robotics).
+# 16-DOF fixed-base dexterous hand: 4 fingers (ff/mf/rf index-middle-ring + th thumb),
+# 4 joints each (j0 = spread/base, j1-j3 = curl). Position-actuated. Used for in-hand cube
+# reorientation (AllegroHand benchmark). Gains follow the IsaacGym AllegroHand config
+# (light fingers: low stiffness/damping, small effort limit).
+
+floating_base: false                 # palm bolted to the world (fixed-base articulation)
+
+default_joint_angles:                # cupped hold: fingers curled inward + thumb opposed,
+                                     # forming a bowl that cradles a cube on the palm (j0=spread,
+                                     # j1=MCP flex, j2=PIP, j3=DIP; thumb thj0=opposition rotation)
+  ffj0: 0.0
+  ffj1: 0.75
+  ffj2: 0.90
+  ffj3: 0.40
+  mfj0: 0.0
+  mfj1: 0.75
+  mfj2: 0.90
+  mfj3: 0.40
+  rfj0: 0.0
+  rfj1: 0.75
+  rfj2: 0.90
+  rfj3: 0.40
+  thj0: 1.30
+  thj1: 0.30
+  thj2: 0.40
+  thj3: 0.60
+
+actuated_joints: ["*"]               # all 16 finger joints
+
+drive:
+  default: { stiffness: 40.0, damping: 2.0, max_force: 5.0, drive_type: force }
+
+display_color: [0.15, 0.15, 0.16]
