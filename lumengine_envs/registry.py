@@ -48,7 +48,7 @@ REGISTRY: dict[str, TaskSpec] = {
 
     "Anymal": TaskSpec(
         id="Anymal", module="anymal_task", cls="AnymalTask", config_cls=AnymalConfig,
-        domain="locomotion", desc="ANYmal-C (URDF) - velocity-command walking (IsaacLab reward).",
+        domain="locomotion", desc="ANYmal-C (URDF) - velocity-command walking (11-term flat reward).",
         default_envs=4096, max_epochs=1500,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="ANYMAL_PPO_PARAMS"),
 
