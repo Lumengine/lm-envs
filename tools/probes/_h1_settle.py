@@ -5,8 +5,8 @@ open-loop settle tips a statically-unstable inverted pendulum). If the feet neve
 bear load while the base sinks through the 0.095 spawn gap -> a contact bug."""
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tasks"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import _bootstrap
 _bootstrap.bootstrap()
 import lm.rl as rl

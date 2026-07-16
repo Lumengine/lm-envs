@@ -16,8 +16,8 @@ not guesses:
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tasks"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import _bootstrap
 _bootstrap.bootstrap()
 import lm.rl as rl
