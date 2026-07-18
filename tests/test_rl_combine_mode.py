@@ -46,7 +46,7 @@ def test_combine_mode_binding():
 if __name__ == "__main__":
     try:
         _code = run()
-    except BaseException:
+    except Exception:
         import traceback
         print("[test] FAILED:")
         traceback.print_exc()

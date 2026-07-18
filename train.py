@@ -93,7 +93,7 @@ def main():
             if args.resume_from:
                 kw["resume_from"] = args.resume_from
             rl.train_rl_games(task, **kw)
-    except BaseException:
+    except Exception:
         import traceback
         print("[train] run raised:")
         traceback.print_exc()

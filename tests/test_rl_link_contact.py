@@ -76,7 +76,7 @@ def test_phase3_link_contact():
 if __name__ == "__main__":
     try:
         sys.exit(run())
-    except BaseException:
+    except Exception:
         import traceback
         print("[test] FAILED:")
         traceback.print_exc()

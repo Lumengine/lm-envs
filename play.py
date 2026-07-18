@@ -77,7 +77,7 @@ def main():
                 "games_num": 100000, "deterministic": True, "render": False}
             rl.play_rl_games(task, args.checkpoint, params=params,
                              realtime=not (cfg.headless or args.no_realtime), speed=args.speed)
-    except BaseException:
+    except Exception:
         import traceback
         print("[play] run raised:")
         traceback.print_exc()

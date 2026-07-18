@@ -101,7 +101,7 @@ def test_phase1_tensor_surface():
 if __name__ == "__main__":
     try:
         sys.exit(run())
-    except BaseException:
+    except Exception:
         import traceback
         print("[test] FAILED:")
         traceback.print_exc()

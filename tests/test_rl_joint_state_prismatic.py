@@ -76,7 +76,7 @@ def test_prismatic_joint_state_ingest():
 if __name__ == "__main__":
     try:
         sys.exit(run())
-    except BaseException:
+    except Exception:
         import traceback
         print("[test] FAILED:")
         traceback.print_exc()
