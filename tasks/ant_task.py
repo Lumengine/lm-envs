@@ -99,7 +99,18 @@ class AntTask(rl.VecTask):
             config=rl.SimConfig(substeps=SUBSTEPS, device="auto",
                                 # the ant's 8 capsule legs sit near the ground -> many
                                 # broadphase pairs; size the GPU buffers generously.
-                                gpu_contact_buffer_multiplier=max(2.0, int(self.cfg.num_envs) / 256.0)),
+                                gpu_contact_buffer_multiplier=max(2.0, int(self.cfg.num_envs) / 256.0),
+                                # Found/lost pair churn outgrows the multiplier-scaled
+                                # default — and grows QUADRATICALLY with N here (PhysX
+                                # asks 4M at 1024 envs, 64M at 4096; surfaced by the
+                                # faulted-scene report — the old silent overflow made the
+                                # sim MISS interactions). Suspected warmup transient
+                                # (falling ants overlapping neighbor envs' AABBs); the
+                                # quadratic sizing matches what PhysX measures until that
+                                # is tamed at the source.
+                                gpu_found_lost_pairs_capacity=max(
+                                    4 << 20,
+                                    ((int(self.cfg.num_envs) ** 2) * (4 << 20)) // (1024 * 1024))),
             title="Ant (MJCF, run-forward)")
         sim.play()
         super().__init__(sim, runner, num_obs=NUM_OBS, num_actions=N_DOF, name="Ant",
