@@ -21,8 +21,8 @@ pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
 pip install lumotion-<version>-cp311-cp311-win_amd64.whl
 # 3. This package + the default trainer:
 pip install lumotion-envs[rl-games]
-# 4. Point at the assets (clone of this repo, or a fetched cache):
-set LMENVS_ASSETS=C:\path\to\lm-envs\assets
+# 4. Fetch the asset pack (robots) into the local cache:
+lumotion-fetch-assets
 
 lumotion-train --list                     # the task catalog
 lumotion-train --task Go2                 # headless train (rl_games)
