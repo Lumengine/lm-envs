@@ -32,6 +32,10 @@ def run_stage(label, cmd):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--full", action="store_true", help="smoke every registry task")
+    ap.add_argument("--bench", action="store_true",
+                    help="add the perf gate (Ant@4096 must clear 300k env-steps/s — "
+                         "a floor far below the thermal band, catching real "
+                         "regressions only). Meant for the nightly, not every push.")
     args = ap.parse_args()
 
     stages = [
@@ -40,6 +44,10 @@ def main():
                   + ([] if args.full else ["--only", QUICK_SMOKE])),
         ("train", [sys.executable, str(RUNNER), "--train"]),
     ]
+    if args.bench:
+        stages.append(("bench", [sys.executable, str(REPO / "tools" / "bench_steps.py"),
+                                 "--task", "Ant", "--envs", "4096",
+                                 "--min-env-sps", "300000"]))
     failed = [label for label, cmd in stages if run_stage(label, cmd) != 0]
     print("\n=== preflight:", "PASS — safe to push" if not failed
           else f"FAIL — {', '.join(failed)}")

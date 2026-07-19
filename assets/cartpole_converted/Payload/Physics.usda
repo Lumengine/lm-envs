@@ -48,7 +48,9 @@ def Xform "cartpole"
             point3f physics:localPos1 = (0, 0, 0)
             quatf physics:localRot0 = (1, 0, 0, 0)
             quatf physics:localRot1 = (1, 0, 0, 0)
-            float physxJoint:maxJointVelocity = 8
+            # PhysxSchema units: angular maxJointVelocity is DEGREES/second.
+            # 458.36624 deg/s = the URDF's 8 rad/s velocity limit.
+            float physxJoint:maxJointVelocity = 458.36624
             custom float urdf:limit:effort = 1000
             custom float urdf:limit:velocity = 8
         }

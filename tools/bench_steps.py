@@ -72,6 +72,12 @@ def main():
                     help="comma-separated num_envs values (one subprocess each)")
     ap.add_argument("--steps", type=int, default=200)
     ap.add_argument("--warmup", type=int, default=50)
+    # PERF GATE: exit 1 if any measured env-steps/s falls below this floor.
+    # Calibrate WELL below the thermal band (Ant@4096 swings 410-480k on the
+    # reference machine depending on GPU temperature): the gate exists to catch
+    # real regressions (a sync-storm reappearing = 8x loss), never thermals.
+    ap.add_argument("--min-env-sps", type=float, default=None,
+                    help="fail (exit 1) if env-steps/s drops below this floor")
     ap.add_argument("--_one", type=int, help=argparse.SUPPRESS)   # internal: single run
     args = ap.parse_args()
 
@@ -81,6 +87,7 @@ def main():
 
     env_counts = [int(x) for x in args.envs.split(",") if x.strip()]
     rows = []
+    bench_failed = False
     for n in env_counts:
         print(f"[bench] {args.task} @ {n} envs ...", flush=True)
         proc = subprocess.run(
@@ -91,19 +98,28 @@ def main():
         m = re.search(r"RESULT .*", out)
         if proc.returncode != 0 or not m:
             print(f"[bench] {n} envs FAILED:\n" + "\n".join(out.splitlines()[-15:]))
+            bench_failed = True
             continue
         print("[bench] " + m.group(0))
         rows.append(m.group(0))
 
+    gate_failed = False
     if rows:
         print("\n=== bench summary ===")
         print(f"{'envs':>8} {'policy sps':>12} {'env-steps/s':>14} {'substeps/s':>14}")
         for r in rows:
             kv = dict(p.split("=") for p in r.split()[1:])
+            env_sps = float(kv["env_sps"])
             print(f"{kv['envs']:>8} {float(kv['policy_sps']):>12.1f} "
-                  f"{float(kv['env_sps']):>14.0f} {float(kv['env_substeps']):>14.0f}")
+                  f"{env_sps:>14.0f} {float(kv['env_substeps']):>14.0f}")
+            if args.min_env_sps is not None and env_sps < args.min_env_sps:
+                print(f"    ^^ PERF GATE FAILED: {env_sps:.0f} < floor {args.min_env_sps:.0f}")
+                gate_failed = True
         print("\nScaling read: env-steps/s should GROW with envs until the GPU saturates;"
               "\nan early plateau = CPU/sync-bound (see plan 003, Phase 2).")
+
+    if bench_failed or gate_failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
