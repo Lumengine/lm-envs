@@ -7,14 +7,14 @@ displacement. Isolates "torque too weak" from "RL stuck standing".
 """
 import os, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
 import torch
 
-_ANT = _bootstrap.ASSETS / "ant.xml"
-_CFG = _bootstrap.ASSETS / "ant.rl.yaml"
+_ANT = _assets.ASSETS / "ant.xml"
+_CFG = _assets.ASSETS / "ant.rl.yaml"
 N_DOF = 8
 N = 16
 

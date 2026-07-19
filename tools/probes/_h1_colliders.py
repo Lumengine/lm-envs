@@ -4,14 +4,14 @@ UsdGeom types. If ankle_link has no collider, the robot sinks through the ground
 the feet -> the collapse is a missing-foot-collider bug, not a balance problem."""
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tasks"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
 from lumengine_envs.config import H1Config
-from legged_velocity import _make_morph
-ASSETS = _bootstrap.ASSETS
+from lumengine_envs.tasks.legged_velocity import _make_morph
+ASSETS = _assets.ASSETS
 
 cfg = H1Config()
 morph = _make_morph(ASSETS / cfg.robot, ASSETS / cfg.rl_yaml)

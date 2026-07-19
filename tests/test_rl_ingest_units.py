@@ -18,14 +18,13 @@ import math
 import os
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
 
-ROBOT = _bootstrap.ASSETS / "pendulum_units_test.usda"
-WORLD = _bootstrap.ASSETS / "world_ingest_units_test.usd"
+ROBOT = _assets.ASSETS / "pendulum_units_test.usda"
+WORLD = _assets.ASSETS / "world_ingest_units_test.usd"
 NUM_ENVS = 2
 ANGVEL_DEG_S = 90.0          # schema deg/s -> pi/2 rad/s effective
 DAMPING_PER_DEG = 5.0        # schema torque per deg/s -> 286.5 N.m.s/rad effective

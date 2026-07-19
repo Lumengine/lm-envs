@@ -21,14 +21,13 @@ import atexit
 import os
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
 
-ROBOT = _bootstrap.ASSETS / "cartpole_converted" / "cartpole.usda"
-WORLD = _bootstrap.ASSETS / "world_teardown_test.usd"
+ROBOT = _assets.ASSETS / "cartpole_converted" / "cartpole.usda"
+WORLD = _assets.ASSETS / "world_teardown_test.usd"
 NUM_ENVS = 2
 NUM_DOFS = 2   # cartpole: cart (prismatic) + pole (revolute)
 

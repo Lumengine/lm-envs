@@ -22,7 +22,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO / "tasks"))
 os.environ.setdefault("LM_PHYSX_SHARE_CUDA_CONTEXT", "1")
 
 

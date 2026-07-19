@@ -11,15 +11,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
-import anymal_task as A
+import lumengine_envs.tasks.anymal_task as A
 from lumengine_envs.config import AnymalConfig
 
-ROBOT = _bootstrap.ASSETS / "anymal_converted" / "anymal.usda"
-WORLD = _bootstrap.ASSETS / "world_instanceable_test.usd"
+ROBOT = _assets.ASSETS / "anymal_converted" / "anymal.usda"
+WORLD = _assets.ASSETS / "world_instanceable_test.usd"
 NUM_ENVS = 64
 _CFG = AnymalConfig()      # ground_z/env_spacing moved from module constants to the config
 

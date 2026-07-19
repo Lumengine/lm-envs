@@ -10,14 +10,13 @@ ingests, and checks the cart DOF starts at ~0.4 (not 0). Pure ingest check.
 import os
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
 
-ROBOT = _bootstrap.ASSETS / "cartpole_converted" / "cartpole.usda"
-WORLD = _bootstrap.ASSETS / "world_jointstate_prismatic_test.usd"
+ROBOT = _assets.ASSETS / "cartpole_converted" / "cartpole.usda"
+WORLD = _assets.ASSETS / "world_jointstate_prismatic_test.usd"
 CART_POS = 0.4   # meters
 NUM_ENVS = 2
 CART_DOF = 0   # cartpole DOF order: 0 = cart (prismatic), 1 = pole (revolute)

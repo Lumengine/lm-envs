@@ -16,7 +16,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO / "tasks"))
 
 # The direct-GPU torch interop needs the shared CUDA context; set it before any
 # engine import so users (and CI) don't have to remember the env var.

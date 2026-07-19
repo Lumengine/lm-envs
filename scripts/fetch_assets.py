@@ -88,9 +88,8 @@ def convert_anymal(urdf: Path, force: bool):
     if ANYMAL_OUT_USD.exists() and not force:
         print(f"[convert] {_rel(ANYMAL_OUT_USD)} already present")
         return
-    sys.path.insert(0, str(REPO / "tasks"))
-    import _bootstrap
-    _bootstrap.bootstrap()          # raises with a clear message if LUMENGINE_ROOT unset
+    from lumengine_envs import assets as _assets
+    __import__('lumengine_envs._engine', fromlist=['x']).ensure_engine()          # raises with a clear message if LUMENGINE_ROOT unset
     from lm.rl import _convert      # engine converter wrapper (subprocess, clean PYTHONPATH)
 
     print(f"[convert] {_rel(urdf)} -> {_rel(ANYMAL_OUT_DIR)}")

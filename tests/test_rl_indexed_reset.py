@@ -11,13 +11,11 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-
 NUM_ENVS = 6
 
 
 def run():
-    import anymal_task as A
+    import lumengine_envs.tasks.anymal_task as A
     import lm.rl as rl
     import torch
 

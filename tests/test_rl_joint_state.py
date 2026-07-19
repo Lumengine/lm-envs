@@ -11,14 +11,13 @@ import math
 import os
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs import assets as _assets
 import lm.rl as rl
 
-ROBOT = _bootstrap.ASSETS / "cartpole_converted" / "cartpole.usda"
-WORLD = _bootstrap.ASSETS / "world_jointstate_test.usd"
+ROBOT = _assets.ASSETS / "cartpole_converted" / "cartpole.usda"
+WORLD = _assets.ASSETS / "world_jointstate_test.usd"
 POLE_ANGLE_DEG = 20.0
 NUM_ENVS = 2
 POLE_DOF = 1   # cartpole DOF order: 0 = cart (prismatic), 1 = pole (revolute)

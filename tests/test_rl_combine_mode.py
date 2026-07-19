@@ -9,10 +9,8 @@ to the PxMaterial. This validates the public SDK binding (enum + getters/setters
 import os
 import sys
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 
 
 def run():

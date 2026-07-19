@@ -17,13 +17,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-
 NUM_ENVS = 16
 
 
 def run():
-    import cartpole_task as C
+    import lumengine_envs.tasks.cartpole_task as C
     import lm.rl as rl
     import torch
 

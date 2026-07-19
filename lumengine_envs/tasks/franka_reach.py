@@ -10,17 +10,14 @@ Run via the CLI:
     python play.py  --task FrankaReach --checkpoint runs/FrankaReach_.../nn/FrankaReach.pth
 """
 import math
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))        # for _bootstrap
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))    # for lumengine_envs
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 from lumengine_envs.config import FrankaReachConfig
 
-ASSETS = _bootstrap.ASSETS
+from lumengine_envs.assets import ASSETS
 CLIP_OBS = 5.0
 MAX_EPISODE_LENGTH = 250            # 5 s at 50 Hz — plenty for one reach
 SUBSTEPS = 2

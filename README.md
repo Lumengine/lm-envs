@@ -1,7 +1,8 @@
-# lm-envs
+# lm-envs — the Lumotion task suite
 
-Reinforcement-learning **environments** for the [Lumengine](https://lumengine.com)
-engine. The engine ships the `lm.rl` façade (the `RlSim` GPU-tensor API, the
+**Lumotion** is the robot-RL simulation product of the Lumiverse family, built on
+the [Lumengine](https://lumengine.com) engine. This repo is its **task suite**
+(pip: `lumotion-envs`). The engine ships the `lm.rl` façade (the `RlSim` GPU-tensor API, the
 `World` + morph USD-authoring layer, and the `rl_games` / `rsl_rl` / `skrl`
 trainer adapters); this repo holds the **tasks**, robot assets and a small task
 registry + CLI that *use* it.
@@ -10,6 +11,25 @@ Robots are authored from their **upstream URDF/MJCF** and converted to USD by th
 engine — GPU-vectorized, thousands of environments in one PhysX scene.
 
 ## Quickstart
+
+### A. pip install (wheels)
+
+```bash
+# 1. CUDA torch FIRST (a bare `pip install torch` pulls the CPU build):
+pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+# 2. The engine runtime wheel (built by Lumengine's scripts/build_rl_wheel.py):
+pip install lumotion-<version>-cp311-cp311-win_amd64.whl
+# 3. This package + the default trainer:
+pip install lumotion-envs[rl-games]
+# 4. Point at the assets (clone of this repo, or a fetched cache):
+set LMENVS_ASSETS=C:\path\to\lm-envs\assets
+
+lumotion-train --list                     # the task catalog
+lumotion-train --task Go2                 # headless train (rl_games)
+lumotion-play  --task Go2 --checkpoint runs/Go2_.../nn/Go2.pth --cmd 1,0,0
+```
+
+### B. dev checkout (engine build tree)
 
 ```bash
 # 1. Build the Lumengine engine so lm.rl is deployed to build/<cfg>/python
@@ -77,11 +97,11 @@ never by a shared pytest session).
 ## Layout
 
 ```
-train.py  play.py            unified CLI (registry-driven)
-lumengine_envs/              the package: task registry + typed configs
-tasks/                       task implementations + _bootstrap
+train.py  play.py            repo shims over lumengine_envs.cli (pip: lumotion-train / lumotion-play)
+lumengine_envs/              the pip package: registry + typed configs + cli + engine/assets seams
+lumengine_envs/tasks/        task implementations (bootstrap the engine on import)
+lumengine_envs/configs/      per-task yaml overrides (shipped as package data)
 assets/                      robot sources (URDF/MJCF) + per-robot LICENSE; USD is a build artifact
-configs/                     optional per-task yaml overrides
 tests/                       tier0 (engine-free) / tier1 (smoke) / tier2 (train) / soak
 scripts/                     fetch_assets, run_engine_tests, preflight
 tools/                       bench_steps + archived bring-up probes

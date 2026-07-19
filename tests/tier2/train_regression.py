@@ -19,7 +19,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO / "tasks"))
 os.environ.setdefault("LM_PHYSX_SHARE_CUDA_CONTEXT", "1")
 
 # Per-task budgets: epochs kept short — this is a regression gate, not a baseline.

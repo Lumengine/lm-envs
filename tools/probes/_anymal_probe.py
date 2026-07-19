@@ -8,12 +8,11 @@ posture.
 """
 import os, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tasks"))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 import torch
-import anymal_task as AT
+import lumengine_envs.tasks.anymal_task as AT
 
 
 def main():

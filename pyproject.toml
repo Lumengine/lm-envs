@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lumotion-envs"
+version = "0.1.0"
+description = "Lumotion task suite - robot-RL locomotion, manipulation and classic-control environments for the Lumotion runtime"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = { file = "LICENSE" }
+dependencies = [
+    "numpy",
+    "pyyaml",
+]
+
+# The engine itself (`pip install lumotion`) is NOT declared: dev
+# checkouts run against a Lumengine build tree via LUMENGINE_ROOT instead,
+# and torch must be installed as a CUDA build BY THE USER FIRST (a bare
+# `pip install torch` on Windows pulls the CPU build and clobbers CUDA —
+# see requirements-rl.txt).
+[project.optional-dependencies]
+rl-games = ["rl-games==1.6.5"]
+rsl-rl = ["rsl-rl-lib==2.2.4"]
+skrl = ["skrl==1.4.3", "gym==0.26.2"]
+
+[project.scripts]
+lumotion-train = "lumengine_envs.cli:train_main"
+lumotion-play = "lumengine_envs.cli:play_main"
+
+[tool.setuptools.packages.find]
+include = ["lumengine_envs*"]
+
+[tool.setuptools.package-data]
+lumengine_envs = ["configs/*.yaml"]

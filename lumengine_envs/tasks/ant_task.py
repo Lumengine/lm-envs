@@ -16,18 +16,16 @@ obs(34) = base_z + lin_vel_b + ang_vel_b*0.25 + up_proj + heading_b_xy
 action(8) -> joint torque = action * cfg.torque_scale   (eJOINT_FORCE, PD drive inert)
 reward = 1.0*v_forward + 0.5*upright + 0.5*alive - 0.005*||action||^2
 """
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # for lumengine_envs
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
+from lumengine_envs.assets import ASSETS
 import lm.rl as rl
 from lumengine_envs.config import AntConfig
 
-_ANT = _bootstrap.ASSETS / "ant.xml"               # MuJoCo MJCF (imported via rl.Mjcf)
-_CFG = _bootstrap.ASSETS / "ant.rl.yaml"           # floating base + inert drive (prep config)
+_ANT = ASSETS / "ant.xml"               # MuJoCo MJCF (imported via rl.Mjcf)
+_CFG = ASSETS / "ant.rl.yaml"           # floating base + inert drive (prep config)
 
 N_DOF       = 8
 GROUND_Z    = 0.0

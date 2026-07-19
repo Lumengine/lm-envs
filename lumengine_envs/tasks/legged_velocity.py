@@ -13,17 +13,14 @@ obs(12 + 3*n_dof) = base_lin_vel*2 + base_ang_vel*0.25 + projected_gravity
 action(n_dof) -> target = action_scale*action + default stance ; PD from the yaml
 """
 import math
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # for lumengine_envs
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 from lumengine_envs.config import LeggedConfig
 
-ASSETS = _bootstrap.ASSETS
+from lumengine_envs.assets import ASSETS
 SUBSTEPS = 2
 LIN_VEL_SCALE, ANG_VEL_SCALE = 2.0, 0.25
 DOF_VEL_SCALE = 0.05

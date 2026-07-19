@@ -8,7 +8,7 @@ from lumengine_envs.config import BaseConfig, apply_dict, load_yaml
 from lumengine_envs.registry import REGISTRY
 
 REPO = Path(__file__).resolve().parents[2]
-CONFIGS = REPO / "configs"
+CONFIGS = REPO / "lumengine_envs" / "configs"
 
 DOMAINS = {"classic", "locomotion", "manipulation", "hands", "aerial"}
 

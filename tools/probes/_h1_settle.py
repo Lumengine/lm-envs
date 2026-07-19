@@ -5,14 +5,13 @@ open-loop settle tips a statically-unstable inverted pendulum). If the feet neve
 bear load while the base sinks through the 0.095 spawn gap -> a contact bug."""
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tasks"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 import torch
 from lumengine_envs.config import H1Config
-from legged_velocity import LeggedVelocityTask, _quat_rotate_inv
+from lumengine_envs.tasks.legged_velocity import LeggedVelocityTask, _quat_rotate_inv
 
 
 def main():

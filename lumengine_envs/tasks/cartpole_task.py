@@ -9,17 +9,14 @@ Run via the CLI:
     python play.py  --task Cartpole --checkpoint runs/Cartpole_.../nn/Cartpole.pth
 """
 import math
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))   # for _bootstrap
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # for lumengine_envs
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 from lumengine_envs.config import CartpoleConfig
 
-ASSETS = _bootstrap.ASSETS
+from lumengine_envs.assets import ASSETS
 NUM_DOFS    = 2
 ANGLE_LIMIT = math.pi / 2
 CART_LIMIT  = 3.0

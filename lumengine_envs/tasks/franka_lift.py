@@ -16,17 +16,14 @@ Run via the CLI:
     python train.py --task FrankaLift
 """
 import math
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 from lumengine_envs.config import FrankaLiftConfig
 
-ASSETS = _bootstrap.ASSETS
+from lumengine_envs.assets import ASSETS
 CLIP_OBS = 5.0
 MAX_EPISODE_LENGTH = 300
 SUBSTEPS = 2

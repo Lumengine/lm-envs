@@ -6,9 +6,8 @@ without CUDA or the engine. `load_task()` lazily imports the task module on dema
 returns its class + optional rl_games PPO params (referenced by attribute name so this
 file stays import-light).
 
-Migration note: tasks currently live as top-level modules under `tasks/` (e.g.
-`anymal_task`). The CLIs put `tasks/` on `sys.path`. As tasks move into
-`lumengine_envs/tasks/<domain>/`, only the `module` field here changes.
+Tasks live in `lumengine_envs.tasks.*`; importing one bootstraps the engine
+(see `lumengine_envs._engine`).
 """
 
 import importlib
@@ -36,67 +35,67 @@ class TaskSpec:
 # The catalog. Keep ids stable — they are the public CLI handle and the baselines/ key.
 REGISTRY: dict[str, TaskSpec] = {
     "Cartpole": TaskSpec(
-        id="Cartpole", module="cartpole_task", cls="CartpoleTask", config_cls=CartpoleConfig,
+        id="Cartpole", module="lumengine_envs.tasks.cartpole_task", cls="CartpoleTask", config_cls=CartpoleConfig,
         domain="classic", desc="Balance a pole on a force-controlled cart (fixed base).",
         default_envs=512, max_epochs=200),
 
     "Ant": TaskSpec(
-        id="Ant", module="ant_task", cls="AntTask", config_cls=AntConfig,
+        id="Ant", module="lumengine_envs.tasks.ant_task", cls="AntTask", config_cls=AntConfig,
         domain="locomotion", desc="MuJoCo ant (MJCF import) - run forward, torque control.",
         default_envs=4096, max_epochs=500,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="ANT_PPO_PARAMS"),
 
     "Anymal": TaskSpec(
-        id="Anymal", module="anymal_task", cls="AnymalTask", config_cls=AnymalConfig,
+        id="Anymal", module="lumengine_envs.tasks.anymal_task", cls="AnymalTask", config_cls=AnymalConfig,
         domain="locomotion", desc="ANYmal-C (URDF) - velocity-command walking (11-term flat reward).",
         default_envs=4096, max_epochs=1500,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="ANYMAL_PPO_PARAMS"),
 
     "Go2": TaskSpec(
-        id="Go2", module="legged_velocity", cls="LeggedVelocityTask", config_cls=Go2Config,
+        id="Go2", module="lumengine_envs.tasks.legged_velocity", cls="LeggedVelocityTask", config_cls=Go2Config,
         domain="locomotion", desc="Unitree Go2 (URDF) - velocity-command walking (shared legged task).",
         default_envs=4096, max_epochs=1000,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 
     "Go1": TaskSpec(
-        id="Go1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=Go1Config,
+        id="Go1", module="lumengine_envs.tasks.legged_velocity", cls="LeggedVelocityTask", config_cls=Go1Config,
         domain="locomotion", desc="Unitree Go1 (MJCF, Menagerie) - velocity-command walking.",
         default_envs=4096, max_epochs=1000,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 
     "A1": TaskSpec(
-        id="A1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=A1Config,
+        id="A1", module="lumengine_envs.tasks.legged_velocity", cls="LeggedVelocityTask", config_cls=A1Config,
         domain="locomotion", desc="Unitree A1 (MJCF, Menagerie) - velocity-command walking.",
         default_envs=4096, max_epochs=1000,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 
     "H1": TaskSpec(
-        id="H1", module="legged_velocity", cls="LeggedVelocityTask", config_cls=H1Config,
+        id="H1", module="lumengine_envs.tasks.legged_velocity", cls="LeggedVelocityTask", config_cls=H1Config,
         domain="locomotion", desc="Unitree H1 humanoid (MJCF, Menagerie) - bipedal velocity walking.",
         default_envs=4096, max_epochs=1500,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="LEGGED_PPO_PARAMS"),
 
     "FrankaReach": TaskSpec(
-        id="FrankaReach", module="franka_reach", cls="FrankaReachTask", config_cls=FrankaReachConfig,
+        id="FrankaReach", module="lumengine_envs.tasks.franka_reach", cls="FrankaReachTask", config_cls=FrankaReachConfig,
         domain="manipulation", desc="Franka Panda arm (MJCF, Menagerie) - end-effector reach to a random target.",
         default_envs=4096, max_epochs=300,
         train_kwargs={"horizon_length": 16, "mini_epochs": 5}, ppo_attr="FRANKA_PPO_PARAMS"),
 
     "FrankaLift": TaskSpec(
-        id="FrankaLift", module="franka_lift", cls="FrankaLiftTask", config_cls=FrankaLiftConfig,
+        id="FrankaLift", module="lumengine_envs.tasks.franka_lift", cls="FrankaLiftTask", config_cls=FrankaLiftConfig,
         domain="manipulation", desc="Franka Panda + gripper - grasp a cube and hold it at a goal height.",
         default_envs=4096, max_epochs=1000,
         train_kwargs={"horizon_length": 24, "mini_epochs": 5}, ppo_attr="FRANKA_LIFT_PPO_PARAMS"),
 
     "FrankaCabinet": TaskSpec(
-        id="FrankaCabinet", module="franka_cabinet", cls="FrankaCabinetTask",
+        id="FrankaCabinet", module="lumengine_envs.tasks.franka_cabinet", cls="FrankaCabinetTask",
         config_cls=FrankaCabinetConfig,
         domain="manipulation", desc="Franka Panda opens a cabinet drawer (multi-articulation env).",
         default_envs=4096, max_epochs=1500,
         train_kwargs={"horizon_length": 16, "mini_epochs": 8}, ppo_attr="FRANKA_CABINET_PPO_PARAMS"),
 
     "AllegroCube": TaskSpec(
-        id="AllegroCube", module="allegro_cube", cls="AllegroCubeTask",
+        id="AllegroCube", module="lumengine_envs.tasks.allegro_cube", cls="AllegroCubeTask",
         config_cls=AllegroCubeConfig,
         domain="hands", desc="Allegro Hand in-hand cube reorientation to a goal pose (dexterous).",
         default_envs=8192, max_epochs=5000,
@@ -106,8 +105,8 @@ REGISTRY: dict[str, TaskSpec] = {
 
 def load_task(spec: TaskSpec):
     """Import the task module and resolve (module, task_class, ppo_params). Triggers the
-    engine bootstrap that the task module performs at import — call only after the caller
-    has set LUMENGINE_ROOT (the CLIs do)."""
+    engine bootstrap that the task module performs at import (wheel install or
+    LUMENGINE_ROOT dev checkout — see lumengine_envs._engine)."""
     module = importlib.import_module(spec.module)
     cls = getattr(module, spec.cls)
     ppo = getattr(module, spec.ppo_attr) if spec.ppo_attr else None

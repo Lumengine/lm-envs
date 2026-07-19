@@ -10,17 +10,14 @@ minus an action penalty; dropping the cube costs a penalty and resets the episod
     python train.py --task AllegroCube --num-envs 16 --view      # watch it learn
 """
 import math
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import _bootstrap
-_bootstrap.bootstrap()
+from lumengine_envs._engine import ensure_engine
+ensure_engine()
 import lm.rl as rl
 from lumengine_envs.config import AllegroCubeConfig
 
-ASSETS = _bootstrap.ASSETS
+from lumengine_envs.assets import ASSETS
 CLIP_OBS = 5.0
 SUBSTEPS = 2
 MAX_EPISODE_LENGTH = 400            # ~6.7 s at 60 Hz

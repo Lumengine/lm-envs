@@ -11,8 +11,6 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tasks"))
-
 NUM_ENVS = 16
 MULT = 4
 PATH_CONTACTS = "physics/gpu/memory/maxRigidContactCount"
@@ -20,7 +18,7 @@ PATH_FOUNDLOST = "physics/gpu/memory/foundLostPairsCapacity"
 
 
 def run():
-    import cartpole_task as C
+    import lumengine_envs.tasks.cartpole_task as C
     import lm.rl as rl
     import lm.core as core
     import torch

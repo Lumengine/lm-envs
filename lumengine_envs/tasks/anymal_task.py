@@ -5,12 +5,9 @@ new quadruped is a config, not a new task body.
 
     python train.py --task Anymal
 """
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # for lumengine_envs
-from legged_velocity import LeggedVelocityTask, LEGGED_PPO_PARAMS, _frame_camera  # noqa: F401
+from lumengine_envs.tasks.legged_velocity import LeggedVelocityTask, LEGGED_PPO_PARAMS, _frame_camera  # noqa: F401
 from lumengine_envs.config import AnymalConfig
 
 # Back-compat module constants (used by tests that author worlds directly).
