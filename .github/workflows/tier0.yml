@@ -46,16 +46,16 @@ jobs:
           python -m venv "$RUNNER_TEMP/venv"
           VENV_PY="$RUNNER_TEMP/venv/Scripts/python"
           "$VENV_PY" -m pip install -q dist/lumotion_envs-*.whl
-          # cd OUT of the repo first: from the repo root, `import lumengine_envs`
+          # cd OUT of the repo first: from the repo root, `import lumotion_envs`
           # silently falls back to the checkout and would mask a broken wheel.
           cd "$RUNNER_TEMP"
           "$RUNNER_TEMP/venv/Scripts/lumotion-train" --list
           "$VENV_PY" - << 'EOF'
           from importlib import resources
-          import lumengine_envs
-          assert "site-packages" in lumengine_envs.__file__, \
-              f"imported from the checkout, not the wheel: {lumengine_envs.__file__}"
-          cfgs = [p.name for p in (resources.files(lumengine_envs) / "configs").iterdir()]
+          import lumotion_envs
+          assert "site-packages" in lumotion_envs.__file__, \
+              f"imported from the checkout, not the wheel: {lumotion_envs.__file__}"
+          cfgs = [p.name for p in (resources.files(lumotion_envs) / "configs").iterdir()]
           assert any(c.endswith(".yaml") for c in cfgs), f"packaged configs missing: {cfgs}"
           print("packaged configs:", sorted(cfgs))
           EOF

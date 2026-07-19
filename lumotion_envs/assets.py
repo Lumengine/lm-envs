@@ -2,9 +2,9 @@
 (`lumotion-fetch-assets`).
 
 Resolution order (`assets_dir()`):
-1. LMENVS_ASSETS environment variable (explicit override);
+1. LUMOTION_ASSETS environment variable (explicit override);
 2. the repo checkout's assets/ next to this package (dev / git-clone flow);
-3. the download cache `%LOCALAPPDATA%/lumengine-envs/assets-<ref>/assets`,
+3. the download cache `%LOCALAPPDATA%/lumotion-envs/assets-<ref>/assets`,
    filled by `lumotion-fetch-assets` for wheel installs (no checkout).
 
 The asset pack is the `assets/` tree of the public lm-envs repo, downloaded
@@ -26,7 +26,7 @@ from pathlib import Path
 
 # The asset-pack pin. "main" during development; release tags of
 # lumotion-envs bump this to the matching repo tag.
-ASSETS_REF = os.environ.get("LMENVS_ASSETS_REF", "main")
+ASSETS_REF = os.environ.get("LUMOTION_ASSETS_REF", "main")
 ASSETS_REPO = "Lumengine/lm-envs"
 
 # Pinned upstream: github.com/ANYbotics/anymal_c_simple_description @ master
@@ -37,7 +37,7 @@ ANYMAL_COMMIT = "87b68511622f0f17e78d9ddca7d862f150a93fb4"
 
 def _cache_root() -> Path:
     local = os.environ.get("LOCALAPPDATA", str(Path.home()))
-    return Path(local) / "lumengine-envs"
+    return Path(local) / "lumotion-envs"
 
 
 def _pack_dir(ref: str = ASSETS_REF) -> Path:
@@ -45,7 +45,7 @@ def _pack_dir(ref: str = ASSETS_REF) -> Path:
 
 
 def assets_dir() -> Path:
-    env = os.environ.get("LMENVS_ASSETS")
+    env = os.environ.get("LUMOTION_ASSETS")
     if env:
         return Path(env)
     repo_assets = Path(__file__).resolve().parents[1] / "assets"
@@ -138,7 +138,7 @@ def convert_anymal(assets: Path, urdf: Path, force: bool = False) -> None:
     if out_usd.exists() and not force:
         print(f"[convert] {out_usd} already present")
         return
-    from lumengine_envs._engine import ensure_engine
+    from lumotion_envs._engine import ensure_engine
     ensure_engine()                              # raises with a clear remedy
     from lm.rl import _convert                   # engine converter wrapper
 
@@ -188,7 +188,7 @@ def main():
 
     # Wheel install (no checkout, no override): populate the versioned cache.
     repo_assets = Path(__file__).resolve().parents[1] / "assets"
-    if not os.environ.get("LMENVS_ASSETS") and not repo_assets.is_dir():
+    if not os.environ.get("LUMOTION_ASSETS") and not repo_assets.is_dir():
         assets = fetch_pack(args.force)
 
     urdf = fetch_anymal_source(assets, args.force)

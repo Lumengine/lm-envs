@@ -7,8 +7,8 @@ new quadruped is a config, not a new task body.
 """
 from pathlib import Path
 
-from lumengine_envs.tasks.legged_velocity import LeggedVelocityTask, LEGGED_PPO_PARAMS, _frame_camera  # noqa: F401
-from lumengine_envs.config import AnymalConfig
+from lumotion_envs.tasks.legged_velocity import LeggedVelocityTask, LEGGED_PPO_PARAMS, _frame_camera  # noqa: F401
+from lumotion_envs.config import AnymalConfig
 
 # Back-compat module constants (used by tests that author worlds directly).
 N_DOF = 12

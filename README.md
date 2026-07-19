@@ -65,7 +65,7 @@ python play.py  --task Go2 --checkpoint runs/Go2_.../nn/Go2.pth --cmd 1,0,0
 ## Train / play
 
 The CLI is the front door; every task is registered in
-[`lumengine_envs/registry.py`](lumengine_envs/registry.py).
+[`lumotion_envs/registry.py`](lumotion_envs/registry.py).
 
 ```bash
 python train.py --task <Name> [--num-envs N] [--epochs E] \
@@ -97,10 +97,10 @@ never by a shared pytest session).
 ## Layout
 
 ```
-train.py  play.py            repo shims over lumengine_envs.cli (pip: lumotion-train / lumotion-play)
-lumengine_envs/              the pip package: registry + typed configs + cli + engine/assets seams
-lumengine_envs/tasks/        task implementations (bootstrap the engine on import)
-lumengine_envs/configs/      per-task yaml overrides (shipped as package data)
+train.py  play.py            repo shims over lumotion_envs.cli (pip: lumotion-train / lumotion-play)
+lumotion_envs/              the pip package: registry + typed configs + cli + engine/assets seams
+lumotion_envs/tasks/        task implementations (bootstrap the engine on import)
+lumotion_envs/configs/      per-task yaml overrides (shipped as package data)
 assets/                      robot sources (URDF/MJCF) + per-robot LICENSE; USD is a build artifact
 tests/                       tier0 (engine-free) / tier1 (smoke) / tier2 (train) / soak
 scripts/                     fetch_assets, run_engine_tests, preflight

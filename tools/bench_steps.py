@@ -26,13 +26,13 @@ os.environ.setdefault("LM_PHYSX_SHARE_CUDA_CONTEXT", "1")
 
 
 def bench_one(task_id: str, num_envs: int, steps: int, warmup_steps: int) -> None:
-    from lumengine_envs.registry import REGISTRY, load_task
+    from lumotion_envs.registry import REGISTRY, load_task
     import torch
     if not torch.cuda.is_available():
         print("SKIP: CUDA not available")
         sys.exit(0)
 
-    from lumengine_envs.config import build_config
+    from lumotion_envs.config import build_config
     spec = REGISTRY[task_id]
     _, task_cls, _ = load_task(spec)
     task = task_cls(build_config(spec.config_cls, num_envs=num_envs, headless=True))

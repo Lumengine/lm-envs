@@ -79,7 +79,7 @@ def main():
     jobs = []  # (label, cmd)
     if args.train:
         sys.path.insert(0, str(REPO))
-        from lumengine_envs.registry import REGISTRY
+        from lumotion_envs.registry import REGISTRY
         task_ids = ([t for t in REGISTRY if any(f in t.lower() for f in filters)]
                     if filters else ["Cartpole"])
         for task_id in task_ids:
@@ -88,7 +88,7 @@ def main():
                           "--task", task_id]))
     elif args.smoke:
         sys.path.insert(0, str(REPO))
-        from lumengine_envs.registry import REGISTRY
+        from lumotion_envs.registry import REGISTRY
         for task_id in REGISTRY:
             if filters and not any(f in task_id.lower() for f in filters):
                 continue

@@ -37,8 +37,8 @@ def _fail(msg):
 
 
 def run(task_id: str, epochs: int | None, num_envs: int | None) -> int:
-    from lumengine_envs.config import build_config
-    from lumengine_envs.registry import REGISTRY, load_task
+    from lumotion_envs.config import build_config
+    from lumotion_envs.registry import REGISTRY, load_task
 
     if task_id not in REGISTRY:
         _fail(f"unknown task {task_id!r}")

@@ -1,4 +1,4 @@
-"""Shared pytest infrastructure for LumengineEnvs.
+"""Shared pytest infrastructure for Lumotion.
 
 Skip policy (real skips, not RuntimeErrors):
 - `@pytest.mark.engine` tests skip when LUMENGINE_ROOT is unset or the built
@@ -14,7 +14,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 
-# Make `lumengine_envs` importable regardless of how pytest was invoked.
+# Make `lumotion_envs` importable regardless of how pytest was invoked.
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 

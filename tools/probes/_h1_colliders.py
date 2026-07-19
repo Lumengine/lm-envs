@@ -5,12 +5,12 @@ the feet -> the collapse is a missing-foot-collider bug, not a balance problem."
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
-from lumengine_envs import assets as _assets
+from lumotion_envs import assets as _assets
 import lm.rl as rl
-from lumengine_envs.config import H1Config
-from lumengine_envs.tasks.legged_velocity import _make_morph
+from lumotion_envs.config import H1Config
+from lumotion_envs.tasks.legged_velocity import _make_morph
 ASSETS = _assets.ASSETS
 
 cfg = H1Config()

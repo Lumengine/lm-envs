@@ -55,8 +55,8 @@ def _fail(msg):
 
 
 def run(task_id, hours, num_envs, report_s, max_rss_growth_mb) -> int:
-    from lumengine_envs.config import build_config
-    from lumengine_envs.registry import REGISTRY, load_task
+    from lumotion_envs.config import build_config
+    from lumotion_envs.registry import REGISTRY, load_task
     import torch
     if not torch.cuda.is_available():
         print("SKIP: CUDA not available")

@@ -1,6 +1,6 @@
 # Third-party asset licenses
 
-LumengineEnvs itself is Apache-2.0 (see `LICENSE`). The robot models and assets it
+Lumotion itself is Apache-2.0 (see `LICENSE`). The robot models and assets it
 uses remain under their **own** licenses, listed here. Each *vendored* asset also
 keeps its original license file in its `assets/<asset>/` directory.
 

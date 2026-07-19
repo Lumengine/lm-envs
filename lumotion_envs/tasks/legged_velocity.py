@@ -15,12 +15,12 @@ action(n_dof) -> target = action_scale*action + default stance ; PD from the yam
 import math
 from pathlib import Path
 
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
 import lm.rl as rl
-from lumengine_envs.config import LeggedConfig
+from lumotion_envs.config import LeggedConfig
 
-from lumengine_envs.assets import ASSETS
+from lumotion_envs.assets import ASSETS
 SUBSTEPS = 2
 LIN_VEL_SCALE, ANG_VEL_SCALE = 2.0, 0.25
 DOF_VEL_SCALE = 0.05

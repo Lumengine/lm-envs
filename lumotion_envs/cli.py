@@ -11,14 +11,14 @@ reachable as `python train.py` / `python play.py` from a repo checkout.
 Config layering: dataclass defaults -> configs/<Task>.yaml (auto-loaded if
 present) -> --set key=value -> explicit flags. `--list` works without the
 engine. Engine location: wheel install (`pip install lumotion`) or a dev
-checkout via LUMENGINE_ROOT — see `lumengine_envs._engine`.
+checkout via LUMENGINE_ROOT — see `lumotion_envs._engine`.
 """
 import argparse
 import copy
 from pathlib import Path
 
-from lumengine_envs.config import build_config
-from lumengine_envs.registry import REGISTRY, load_task
+from lumotion_envs.config import build_config
+from lumotion_envs.registry import REGISTRY, load_task
 
 CONFIGS_DIR = Path(__file__).resolve().parent / "configs"
 

@@ -25,12 +25,12 @@ rsl-rl = ["rsl-rl-lib==2.2.4"]
 skrl = ["skrl==1.4.3", "gym==0.26.2"]
 
 [project.scripts]
-lumotion-train = "lumengine_envs.cli:train_main"
-lumotion-play = "lumengine_envs.cli:play_main"
-lumotion-fetch-assets = "lumengine_envs.assets:main"
+lumotion-train = "lumotion_envs.cli:train_main"
+lumotion-play = "lumotion_envs.cli:play_main"
+lumotion-fetch-assets = "lumotion_envs.assets:main"
 
 [tool.setuptools.packages.find]
-include = ["lumengine_envs*"]
+include = ["lumotion_envs*"]
 
 [tool.setuptools.package-data]
-lumengine_envs = ["configs/*.yaml"]
+lumotion_envs = ["configs/*.yaml"]

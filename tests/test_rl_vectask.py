@@ -15,7 +15,7 @@ NUM_ENVS = 8
 
 
 def run():
-    import lumengine_envs.tasks.cartpole_task as C
+    import lumotion_envs.tasks.cartpole_task as C
     import lm.rl as rl
     import torch
 

@@ -7,9 +7,9 @@ displacement. Isolates "torque too weak" from "RL stuck standing".
 """
 import os, sys
 from pathlib import Path
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
-from lumengine_envs import assets as _assets
+from lumotion_envs import assets as _assets
 import lm.rl as rl
 import torch
 

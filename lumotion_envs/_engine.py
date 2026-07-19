@@ -29,7 +29,7 @@ def ensure_engine() -> None:
     root = os.environ.get("LUMENGINE_ROOT")
     if not root:
         raise ImportError(
-            "lumengine-envs: cannot import the engine package 'lm'. Either\n"
+            "lumotion-envs: cannot import the engine package 'lm'. Either\n"
             "  - install the Lumotion runtime wheel:  pip install lumotion\n"
             "  - or point LUMENGINE_ROOT at a Lumengine repo with a built "
             "engine (expects <LUMENGINE_ROOT>/build/<cfg>/python)")
@@ -39,7 +39,7 @@ def ensure_engine() -> None:
     python_dir = build_dir / "python"
     if not python_dir.exists():
         raise ImportError(
-            f"lumengine-envs: LUMENGINE_ROOT={root} but {python_dir} does not "
+            f"lumotion-envs: LUMENGINE_ROOT={root} but {python_dir} does not "
             f"exist — build the engine, or fix LUMENGINE_ROOT / "
             f"LUMENGINE_BUILD_CONFIG (currently {cfg!r}).")
     if sys.platform == "win32" and hasattr(os, "add_dll_directory"):

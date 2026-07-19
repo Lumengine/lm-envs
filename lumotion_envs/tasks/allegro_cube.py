@@ -12,12 +12,12 @@ minus an action penalty; dropping the cube costs a penalty and resets the episod
 import math
 from pathlib import Path
 
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
 import lm.rl as rl
-from lumengine_envs.config import AllegroCubeConfig
+from lumotion_envs.config import AllegroCubeConfig
 
-from lumengine_envs.assets import ASSETS
+from lumotion_envs.assets import ASSETS
 CLIP_OBS = 5.0
 SUBSTEPS = 2
 MAX_EPISODE_LENGTH = 400            # ~6.7 s at 60 Hz

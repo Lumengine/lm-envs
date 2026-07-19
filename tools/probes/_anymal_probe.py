@@ -8,11 +8,11 @@ posture.
 """
 import os, sys
 from pathlib import Path
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
 import lm.rl as rl
 import torch
-import lumengine_envs.tasks.anymal_task as AT
+import lumotion_envs.tasks.anymal_task as AT
 
 
 def main():

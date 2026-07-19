@@ -18,7 +18,7 @@ PATH_FOUNDLOST = "physics/gpu/memory/foundLostPairsCapacity"
 
 
 def run():
-    import lumengine_envs.tasks.cartpole_task as C
+    import lumotion_envs.tasks.cartpole_task as C
     import lm.rl as rl
     import lm.core as core
     import torch

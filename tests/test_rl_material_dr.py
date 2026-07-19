@@ -28,7 +28,7 @@ MIN_GAP = 0.05     # meters of slide-distance separation between the two groups
 
 
 def run():
-    import lumengine_envs.tasks.anymal_task as A
+    import lumotion_envs.tasks.anymal_task as A
     import lm.rl as rl
     import torch
 

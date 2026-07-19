@@ -11,12 +11,12 @@ Run via the CLI:
 import math
 from pathlib import Path
 
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
 import lm.rl as rl
-from lumengine_envs.config import CartpoleConfig
+from lumotion_envs.config import CartpoleConfig
 
-from lumengine_envs.assets import ASSETS
+from lumotion_envs.assets import ASSETS
 NUM_DOFS    = 2
 ANGLE_LIMIT = math.pi / 2
 CART_LIMIT  = 3.0

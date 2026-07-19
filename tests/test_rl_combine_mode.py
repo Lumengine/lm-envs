@@ -9,7 +9,7 @@ to the PxMaterial. This validates the public SDK binding (enum + getters/setters
 import os
 import sys
 from pathlib import Path
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
 
 

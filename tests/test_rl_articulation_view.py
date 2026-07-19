@@ -15,7 +15,7 @@ N_LINKS = 60
 
 
 def run():
-    import lumengine_envs.tasks.anymal_task as A
+    import lumotion_envs.tasks.anymal_task as A
     import lm.rl as rl
     import torch
 

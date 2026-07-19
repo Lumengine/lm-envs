@@ -2,7 +2,7 @@
 type coercion, and typo protection. Engine-free."""
 import pytest
 
-from lumengine_envs.config import (CartpoleConfig, Go2Config, apply_dict, apply_set,
+from lumotion_envs.config import (CartpoleConfig, Go2Config, apply_dict, apply_set,
                                    build_config)
 
 

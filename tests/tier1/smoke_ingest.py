@@ -38,7 +38,7 @@ def _finite(torch, t, what, step):
 
 
 def run(task_id: str, num_envs: int, steps: int) -> int:
-    from lumengine_envs.registry import REGISTRY, load_task
+    from lumotion_envs.registry import REGISTRY, load_task
 
     if task_id not in REGISTRY:
         _fail(f"unknown task {task_id!r}; ids: {', '.join(sorted(REGISTRY))}")
@@ -58,7 +58,7 @@ def run(task_id: str, num_envs: int, steps: int) -> int:
         print("SKIP: CUDA not available (direct-GPU batch required)")
         return 0
 
-    from lumengine_envs.config import build_config
+    from lumotion_envs.config import build_config
     _, task_cls, _ = load_task(spec)
     cfg = build_config(spec.config_cls, num_envs=num_envs, headless=True)
     task = task_cls(cfg)

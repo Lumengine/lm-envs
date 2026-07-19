@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from lumengine_envs.registry import REGISTRY
+from lumotion_envs.registry import REGISTRY
 
 REPO = Path(__file__).resolve().parents[2]
 ASSETS = REPO / "assets"

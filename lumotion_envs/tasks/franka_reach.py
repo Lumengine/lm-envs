@@ -12,12 +12,12 @@ Run via the CLI:
 import math
 from pathlib import Path
 
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
 import lm.rl as rl
-from lumengine_envs.config import FrankaReachConfig
+from lumotion_envs.config import FrankaReachConfig
 
-from lumengine_envs.assets import ASSETS
+from lumotion_envs.assets import ASSETS
 CLIP_OBS = 5.0
 MAX_EPISODE_LENGTH = 250            # 5 s at 50 Hz — plenty for one reach
 SUBSTEPS = 2

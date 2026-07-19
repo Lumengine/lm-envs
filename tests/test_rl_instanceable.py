@@ -11,12 +11,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
-from lumengine_envs import assets as _assets
+from lumotion_envs import assets as _assets
 import lm.rl as rl
-import lumengine_envs.tasks.anymal_task as A
-from lumengine_envs.config import AnymalConfig
+import lumotion_envs.tasks.anymal_task as A
+from lumotion_envs.config import AnymalConfig
 
 ROBOT = _assets.ASSETS / "anymal_converted" / "anymal.usda"
 WORLD = _assets.ASSETS / "world_instanceable_test.usd"

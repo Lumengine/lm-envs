@@ -18,11 +18,11 @@ reward = 1.0*v_forward + 0.5*upright + 0.5*alive - 0.005*||action||^2
 """
 from pathlib import Path
 
-from lumengine_envs._engine import ensure_engine
+from lumotion_envs._engine import ensure_engine
 ensure_engine()
-from lumengine_envs.assets import ASSETS
+from lumotion_envs.assets import ASSETS
 import lm.rl as rl
-from lumengine_envs.config import AntConfig
+from lumotion_envs.config import AntConfig
 
 _ANT = ASSETS / "ant.xml"               # MuJoCo MJCF (imported via rl.Mjcf)
 _CFG = ASSETS / "ant.rl.yaml"           # floating base + inert drive (prep config)
