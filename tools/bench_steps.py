@@ -60,7 +60,7 @@ def bench_one(task_id: str, num_envs: int, steps: int, warmup_steps: int) -> Non
     print(f"RESULT task={task_id} envs={num_envs} steps={steps} wall={dt:.3f}s "
           f"policy_sps={sps:.1f} env_sps={sps * num_envs:.0f} "
           f"env_substeps={sps * num_envs * decim:.0f} decimation={decim}")
-    import lm.rl as rl
+    import lumotion as rl
     rl.destroy_world(task.sim, task.runner)
 
 

@@ -17,7 +17,7 @@ SETTLE_STEPS = 200
 
 def run():
     import lumotion_envs.tasks.anymal_task as A
-    import lm.rl as rl
+    import lumotion as rl
     import torch
 
     if not torch.cuda.is_available():

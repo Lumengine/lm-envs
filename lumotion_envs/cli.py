@@ -74,7 +74,7 @@ def train_main():
                        num_envs=args.num_envs, seed=args.seed, headless=not args.view)
 
     module, cls, ppo = load_task(spec)        # imports the task module (engine bootstrap)
-    import lm.rl as rl
+    import lumotion as rl
 
     epochs = args.epochs or spec.max_epochs
     task = cls(cfg)
@@ -142,7 +142,7 @@ def play_main():
         cfg.num_envs = 16
 
     module, cls, ppo = load_task(spec)
-    import lm.rl as rl
+    import lumotion as rl
 
     task = cls(cfg)
     exit_code = 0

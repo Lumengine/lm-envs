@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lumotion_envs._engine import ensure_engine
 ensure_engine()
 from lumotion_envs import assets as _assets
-import lm.rl as rl
+import lumotion as rl
 import lumotion_envs.tasks.anymal_task as A
 from lumotion_envs.config import AnymalConfig
 

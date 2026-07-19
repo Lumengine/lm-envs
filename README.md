@@ -2,7 +2,7 @@
 
 **Lumotion** is the robot-RL simulation product of the Lumiverse family, built on
 the [Lumengine](https://lumengine.com) engine. This repo is its **task suite**
-(pip: `lumotion-envs`). The engine ships the `lm.rl` façade (the `RlSim` GPU-tensor API, the
+(pip: `lumotion-envs`). The engine ships the `lumotion` runtime API (the `RlSim` GPU-tensor API, the
 `World` + morph USD-authoring layer, and the `rl_games` / `rsl_rl` / `skrl`
 trainer adapters); this repo holds the **tasks**, robot assets and a small task
 registry + CLI that *use* it.
@@ -32,7 +32,7 @@ lumotion-play  --task Go2 --checkpoint runs/Go2_.../nn/Go2.pth --cmd 1,0,0
 ### B. dev checkout (engine build tree)
 
 ```bash
-# 1. Build the Lumengine engine so lm.rl is deployed to build/<cfg>/python
+# 1. Build the Lumengine engine so the `lumotion` API is deployed to build/<cfg>/python
 # 2. Point this repo at the engine (required):
 set LUMENGINE_ROOT=C:\path\to\Lumengine
 # 3. Trainers are optional + lazily imported; install what you use:

@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from lumotion_envs._engine import ensure_engine
 ensure_engine()
-import lm.rl as rl
+import lumotion as rl
 import torch
 from lumotion_envs.config import H1Config
 from lumotion_envs.tasks.legged_velocity import LeggedVelocityTask, _quat_rotate_inv

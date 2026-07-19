@@ -106,7 +106,7 @@ def run(task_id, hours, num_envs, report_s, max_rss_growth_mb) -> int:
 
     print(f"PASS: {task_id}: {step} steps over {hours:.1f}h, "
           f"final RSS growth {(_host_rss_mb() - (baseline_rss or 0)):.0f} MB")
-    import lm.rl as rl
+    import lumotion as rl
     rl.destroy_world(task.sim, task.runner)
     return 0
 

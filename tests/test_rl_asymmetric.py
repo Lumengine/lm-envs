@@ -16,7 +16,7 @@ NUM_STATES = 6   # 4 obs + 2 privileged (dof velocities)
 
 def run():
     import lumotion_envs.tasks.cartpole_task as C
-    import lm.rl as rl
+    import lumotion as rl
     import torch
 
     if not torch.cuda.is_available():

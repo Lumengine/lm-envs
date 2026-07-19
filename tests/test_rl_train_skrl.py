@@ -21,7 +21,7 @@ NUM_ENVS = 16
 
 def run():
     import lumotion_envs.tasks.cartpole_task as C
-    import lm.rl as rl
+    import lumotion as rl
     import torch
 
     if not torch.cuda.is_available():

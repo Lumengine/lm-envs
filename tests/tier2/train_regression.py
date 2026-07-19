@@ -75,7 +75,7 @@ def run(task_id: str, epochs: int | None, num_envs: int | None) -> int:
 
     task.step = recording_step
 
-    import lm.rl as rl
+    import lumotion as rl
     kw = dict(max_epochs=epochs, seed=0, **spec.train_kwargs)
     if ppo is not None:
         kw["params"] = ppo

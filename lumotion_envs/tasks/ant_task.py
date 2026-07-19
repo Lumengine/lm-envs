@@ -21,7 +21,7 @@ from pathlib import Path
 from lumotion_envs._engine import ensure_engine
 ensure_engine()
 from lumotion_envs.assets import ASSETS
-import lm.rl as rl
+import lumotion as rl
 from lumotion_envs.config import AntConfig
 
 _ANT = ASSETS / "ant.xml"               # MuJoCo MJCF (imported via rl.Mjcf)

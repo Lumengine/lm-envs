@@ -1,5 +1,5 @@
 """Typed task configuration — replaces the scattered ``os.environ`` knobs the tasks
-used to read. Engine-free (no `lm.rl` import) so configs can be built and `--help`/
+used to read. Engine-free (no `lumotion` import) so configs can be built and `--help`/
 `--list` shown without CUDA or the engine.
 
 Layering (lowest to highest precedence): dataclass defaults -> `configs/<task>.yaml`

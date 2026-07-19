@@ -6,7 +6,7 @@ Two supported situations (plan 003, Phase 3):
 - dev checkout: the engine lives in a Lumengine repo's build tree, pointed
   at by LUMENGINE_ROOT (and optionally LUMENGINE_BUILD_CONFIG).
 
-Every task module calls `ensure_engine()` before importing `lm.rl`; nothing
+Every task module calls `ensure_engine()` before importing `lumotion`; nothing
 else in this repo may touch sys.path for the engine.
 """
 import os
@@ -21,7 +21,7 @@ def ensure_engine() -> None:
     os.environ.setdefault("LM_PHYSX_SHARE_CUDA_CONTEXT", "1")
 
     try:
-        import lm  # noqa: F401  (wheel or already-wired dev path)
+        import lumotion  # noqa: F401  (wheel or already-wired dev path)
         return
     except ImportError:
         pass
@@ -45,4 +45,4 @@ def ensure_engine() -> None:
     if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
         os.add_dll_directory(str(build_dir))
     sys.path.insert(0, str(python_dir))
-    import lm  # noqa: F401 — surfaces the real loader error if still broken
+    import lumotion  # noqa: F401 — surfaces the real loader error if still broken

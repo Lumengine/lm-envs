@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from lumotion_envs._engine import ensure_engine
 ensure_engine()
 from lumotion_envs import assets as _assets
-import lm.rl as rl
+import lumotion as rl
 from lumotion_envs.config import H1Config
 from lumotion_envs.tasks.legged_velocity import _make_morph
 ASSETS = _assets.ASSETS

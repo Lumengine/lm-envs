@@ -94,7 +94,7 @@ def run(task_id: str, num_envs: int, steps: int) -> int:
     print(f"PASS: {task_id}: {steps} steps x {num_envs} envs, "
           f"{resets_seen} env-resets, obs {tuple(obs.shape)} finite")
     # Teardown last — destroy_world hard-exits the process (exit code 0).
-    import lm.rl as rl
+    import lumotion as rl
     rl.destroy_world(task.sim, task.runner)
     return 0
 

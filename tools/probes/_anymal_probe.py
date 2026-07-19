@@ -10,7 +10,7 @@ import os, sys
 from pathlib import Path
 from lumotion_envs._engine import ensure_engine
 ensure_engine()
-import lm.rl as rl
+import lumotion as rl
 import torch
 import lumotion_envs.tasks.anymal_task as AT
 

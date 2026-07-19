@@ -21,7 +21,7 @@ from pathlib import Path
 from lumotion_envs._engine import ensure_engine
 ensure_engine()
 from lumotion_envs import assets as _assets
-import lm.rl as rl
+import lumotion as rl
 
 ROBOT = _assets.ASSETS / "pendulum_units_test.usda"
 WORLD = _assets.ASSETS / "world_ingest_units_test.usd"
