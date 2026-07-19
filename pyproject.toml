@@ -27,6 +27,7 @@ skrl = ["skrl==1.4.3", "gym==0.26.2"]
 [project.scripts]
 lumotion-train = "lumengine_envs.cli:train_main"
 lumotion-play = "lumengine_envs.cli:play_main"
+lumotion-fetch-assets = "lumengine_envs.assets:main"
 
 [tool.setuptools.packages.find]
 include = ["lumengine_envs*"]
