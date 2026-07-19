@@ -1,4 +1,4 @@
-# lm-envs — the Lumotion task suite
+# lumotion-envs — the Lumotion task suite
 
 **Lumotion** is the robot-RL simulation product of the Lumiverse family, built on
 the [Lumengine](https://lumengine.com) engine. This repo is its **task suite**
@@ -110,7 +110,7 @@ runs/                        trainer checkpoints (gitignored)
 
 ## Assets & licensing
 
-lm-envs is **Apache-2.0** (see [`LICENSE`](LICENSE)). Robot models keep their
+lumotion-envs is **Apache-2.0** (see [`LICENSE`](LICENSE)). Robot models keep their
 **own** licenses — every redistributed asset is listed in
 [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) with its license, origin and
 status, and keeps its original license file under `assets/<robot>/`.
